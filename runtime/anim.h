@@ -71,6 +71,10 @@ void rta_play(const rt_engine *e) BANKED;
  * swap curve. On return the visual board and BG show the two tiles
  * exchanged. A failed swap plays it again with the coordinates
  * swapped (the legacy reverse animation). */
+/* Install the game's per-frame pump (input + cursor redraw during
+   blocking animations — legacy render_delay_with_cursor). */
+void rta_set_frame_hook(void (*fn)(void)) BANKED;
+
 void rta_play_swap(uint8_t x1, uint8_t y1,
                    uint8_t x2, uint8_t y2) BANKED;
 

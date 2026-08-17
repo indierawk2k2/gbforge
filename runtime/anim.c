@@ -127,6 +127,19 @@ void rta_update_floats(void) BANKED
     }
 }
 
+/* Per-frame hook: the game's input/cursor pump (the legacy
+   render_delay_with_cursor role). Runs once per animation frame at
+   a VRAM-safe point — after any staged blast, never between vsync
+   and the blanking-window writes. NULL = no pump. */
+static void (*frame_hook)(void);
+
+void rta_set_frame_hook(void (*fn)(void)) BANKED
+{
+    frame_hook = fn;
+}
+
+#define FRAME_HOOK() do { if (frame_hook) frame_hook(); } while (0)
+
 static void wait_frames(uint8_t n)
 {
     /* every blocking wait pumps the non-blocking systems, like the
@@ -135,6 +148,7 @@ static void wait_frames(uint8_t n)
         vsync();
         rta_apply_shake();
         rta_update_floats();
+        FRAME_HOOK();
     }
 }
 
@@ -224,6 +238,7 @@ void rta_play(const rt_engine *e) BANKED
         }
         vsync();
         rtv_blit_board(visual);
+        FRAME_HOOK();
 
         /* 2b) transmute sparkle: hide the new tiles behind a 3-phase
            sprite burst (dot → small → full), then reveal */
@@ -285,6 +300,7 @@ void rta_play(const rt_engine *e) BANKED
             }
         }
         if (!any) break;
+        FRAME_HOOK();
         /* HALF-STEP: stage dirty rows with split tiles */
         rtv_stage_reset();
         for (y = 0; y < 8; y++) {
@@ -334,6 +350,7 @@ void rta_play(const rt_engine *e) BANKED
         }
         vsync();
         rtv_blast();
+        FRAME_HOOK();
 
         /* MOVE one cell (emission order is per-column bottom-up, so
            in-order moves never overwrite a pending faller) */
@@ -375,6 +392,7 @@ void rta_play(const rt_engine *e) BANKED
     }
     vsync();
     rtv_blit_board(visual);
+    FRAME_HOOK();
     wait_frames(RTA_PARAMS->pass_gap);
 }
 
@@ -505,6 +523,7 @@ void rta_play_swap(uint8_t x1, uint8_t y1,
         place_quads(SWAP_SPRITE_B_BASE,
                     bx - dx * off, by - dy * off);
         vsync();
+        FRAME_HOOK();
     }
 
     /* land exchanged */

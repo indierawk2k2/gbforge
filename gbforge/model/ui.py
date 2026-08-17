@@ -63,15 +63,20 @@ class TitleScreen:
     deco_palettes: tuple = ("fire", "fire", "gold", "gold",
                             "earth", "earth", "water", "water",
                             "silver", "silver", "dark", "dark")
+    # Row order MUST match the res contract's PAL_* indices (the
+    # screen attributes name palettes through PAL_FIRE..PAL_SILVER).
+    # The legacy table kept its pre-refactor order after PAL_SILVER
+    # moved from 4 to 7 (ecc125c), which silently turned the title
+    # text's silver-gray ramp into Dark/Obsidian purple for months.
     palettes: tuple = (
-        ((31, 31, 31), (29, 21, 9), (28, 6, 2), (21, 9, 5)),
-        ((31, 31, 31), (10, 19, 22), (7, 15, 22), (2, 5, 7)),
-        ((31, 31, 31), (14, 20, 10), (4, 18, 4), (4, 6, 4)),
-        ((31, 31, 31), (26, 18, 10), (18, 12, 6), (6, 4, 2)),
-        ((31, 31, 31), (20, 20, 20), (16, 20, 24), (4, 4, 6)),
-        ((31, 31, 31), (31, 28, 8), (26, 20, 4), (6, 4, 2)),
-        ((31, 31, 31), (20, 20, 20), (10, 10, 10), (0, 0, 0)),
-        ((31, 31, 31), (18, 10, 24), (10, 4, 16), (2, 0, 4)),
+        ((31, 31, 31), (29, 21, 9), (28, 6, 2), (21, 9, 5)),      # 0 fire
+        ((31, 31, 31), (10, 19, 22), (7, 15, 22), (2, 5, 7)),     # 1 water
+        ((31, 31, 31), (14, 20, 10), (4, 18, 4), (4, 6, 4)),      # 2 earth
+        ((31, 31, 31), (26, 18, 10), (18, 12, 6), (6, 4, 2)),     # 3 bronze
+        ((31, 31, 31), (18, 10, 24), (10, 4, 16), (2, 0, 4)),     # 4 dark
+        ((31, 31, 31), (31, 28, 8), (26, 20, 4), (6, 4, 2)),      # 5 gold
+        ((31, 31, 31), (20, 20, 20), (10, 10, 10), (0, 0, 0)),    # 6 grayscale
+        ((31, 31, 31), (20, 20, 20), (16, 20, 24), (4, 4, 6)),    # 7 silver
     )
 
 

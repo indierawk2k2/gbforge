@@ -10,3 +10,4 @@ obj_debug/
 *.o
 /gbdk
 .DS_Store
+*.sav

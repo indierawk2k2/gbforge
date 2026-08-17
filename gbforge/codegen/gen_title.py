@@ -81,7 +81,10 @@ def emit(game, out_dir):
                    f"{{ {', '.join(tiles)} }};\n")
         item_rows.append(f"    {{ label_{i}, {len(tiles)}, {value} }}")
 
-    deco_attrs = ", ".join(f"PAL_{p.upper()}" for p in t.deco_palettes)
+    # An empty bar still needs a valid C initializer; the runtime
+    # skips drawing entirely when deco_n is 0.
+    deco_attrs = (", ".join(f"PAL_{p.upper()}" for p in t.deco_palettes)
+                  or "0")
 
     with open(os.path.join(out_dir, "title_config.h"), "w") as f:
         f.write(HEADER)

@@ -32,6 +32,16 @@ OBJS = $(OBJ)/main_cascadia.o \
 
 all: prepare cascadia.gbc
 
+# Every object depends on every header. Coarse, but correct: a struct
+# change in engine.h relinked against objects compiled with the old
+# layout yields a ROM whose engine and animator disagree about where
+# the event list lives — a silent, playable, wrong ROM.
+HDRS = $(wildcard *.h $(RUNTIME)/*.h $(GEN)/*.h $(RES)/*.h)
+$(OBJS): $(HDRS) | $(OBJ)
+
+$(OBJ):
+	@mkdir -p $@
+
 debug:
 	$(MAKE) DEBUG=1 all
 

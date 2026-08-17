@@ -39,6 +39,6 @@ GAME = Game(
         menu=Menu("mode_select", pos=(4, 10), label_x=6,
                   items=[("PLAY", 0)]),
         logo_letters=8,                       # C A S C A D I A
-        deco_palettes=("fire", "earth", "gold", "silver") * 3,
+        deco_palettes=(),                     # no deco bar
     ),
 )

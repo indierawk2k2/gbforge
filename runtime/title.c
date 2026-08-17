@@ -65,8 +65,8 @@ uint8_t rtt_show(const ng_title *t) BANKED
         set_bkg_tiles(t->logo_x, t->logo_y + 1, w, 1, bot_row);
     }
 
-    /* decorative palette bar */
-    {
+    /* decorative palette bar (deco_n == 0 declares no bar) */
+    if (t->deco_n) {
         uint8_t deco[16];
         for (i = 0; i < t->deco_n; i++) deco[i] = UI_TILE_SOLID;
         VBK_REG = VBK_ATTRIBUTES;

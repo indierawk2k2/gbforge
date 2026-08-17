@@ -26,8 +26,8 @@ static const ng_menu_item menu_items[1] = {
 
 const ng_title ng_title_screen = {
     8, 3, 4,
-    4, 7, 12,
-    { PAL_FIRE, PAL_EARTH, PAL_GOLD, PAL_SILVER, PAL_FIRE, PAL_EARTH, PAL_GOLD, PAL_SILVER, PAL_FIRE, PAL_EARTH, PAL_GOLD, PAL_SILVER },
+    4, 7, 0,
+    { 0 },
     title_palettes,
     { 4, 10, 6, 2, 1, menu_items }
 };

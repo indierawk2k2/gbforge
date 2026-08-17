@@ -110,6 +110,14 @@ Two design rules carry most of the weight:
   repository passed the same style of scripted checklist (swap-revert,
   scoring, cascades, win/lose) before it was committed.
 
+## Development setup
+
+[AGENTS.md](AGENTS.md) is the onboarding document — environment
+setup, how to rebuild the scripted verification loop against any
+emulator with memory access (symbol table + debug mailbox), and
+the rules that keep the tree healthy. It's written for coding
+agents and works just as well for people.
+
 ## Building the example
 
 Requires [GBDK-2020](https://github.com/gbdk-2020/gbdk-2020) 4.5.0+

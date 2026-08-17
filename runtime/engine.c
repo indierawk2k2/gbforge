@@ -283,8 +283,11 @@ uint8_t rt_process(rt_engine *e) BANKED
     for (y = 0; y < RT_H; y++)
         for (x = 0; x < RT_W; x++)
             if (e->matched[y][x]) {
+                uint8_t k = e->board[y][x];
                 e->board[y][x] = RT_EMPTY;
                 e->cleared_total++;   /* lifetime clear count */
+                if (e->cleared_by_kind[k] != 255)
+                    e->cleared_by_kind[k]++;
             }
 
     flood_manna(e, saved);

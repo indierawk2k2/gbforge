@@ -89,14 +89,14 @@ static void draw_sidebar_layout(void)
         set_win_tiles(0, row, 3, 1, attrs);
     }
     {
-        uint8_t fire_attr[3]  = { PAL_FIRE,  PAL_SILVER, PAL_SILVER };
-        uint8_t water_attr[3] = { PAL_WATER, PAL_SILVER, PAL_SILVER };
-        uint8_t earth_attr[3] = { PAL_EARTH, PAL_SILVER, PAL_SILVER };
-        set_win_tiles(0, 0, 3, 1, fire_attr);
-        set_win_tiles(0, 1, 3, 1, water_attr);
-        set_win_tiles(0, 2, 3, 1, water_attr);
-        set_win_tiles(0, 3, 3, 1, earth_attr);
-        set_win_tiles(0, 4, 3, 1, earth_attr);
+        /* one counter row per tile kind, dot in the kind's own
+           palette (palette i colors kind i in the asset pack) */
+        uint8_t k;
+        for (k = 0; k < 4; k++) {
+            uint8_t attrs[3] = { 0, PAL_SILVER, PAL_SILVER };
+            attrs[0] = k;
+            set_win_tiles(0, k, 3, 1, attrs);
+        }
     }
 
     VBK_REG = VBK_TILES;
@@ -114,43 +114,28 @@ void rth_init(void) BANKED
     draw_border();
     draw_sidebar_layout();
     last_knowledge = 0xFFFF;
-    rth_update(0, 0, 0, 0);
+    rth_update(0, 0);
     SHOW_WIN;
 }
 
-void rth_update(uint8_t fire, uint8_t water, uint8_t earth,
-                uint16_t kp) BANKED
+void rth_update(const uint8_t *kind_counts, uint16_t kp) BANKED
 {
     uint8_t x = KNOWLEDGE_SCREEN_X + 8;
     uint8_t y = KNOWLEDGE_SCREEN_Y + 16;
     uint8_t top, bottom;
     uint8_t r[3];
+    uint8_t k;
 
     VBK_REG = VBK_TILES;
-    /* fire (row 0), water (overflow row 1 + main row 2, 1px shift),
-       earth (overflow row 3 + main row 4, 2px shift) */
-    r[0] = UI_TILE_ROUND3;
-    r[1] = UI_TILE_DIGIT_0 + digit_tens[fire];
-    r[2] = UI_TILE_DIGIT_0 + digit_ones[fire];
-    set_win_tiles(0, 0, 3, 1, r);
-
-    r[0] = UI_TILE_ROUND_OV1;
-    r[1] = UI_TILE_DIGIT_OV1_0 + digit_tens[water];
-    r[2] = UI_TILE_DIGIT_OV1_0 + digit_ones[water];
-    set_win_tiles(0, 1, 3, 1, r);
-    r[0] = UI_TILE_ROUND_S1;
-    r[1] = UI_TILE_DIGIT_S1_0 + digit_tens[water];
-    r[2] = UI_TILE_DIGIT_S1_0 + digit_ones[water];
-    set_win_tiles(0, 2, 3, 1, r);
-
-    r[0] = UI_TILE_ROUND_OV2;
-    r[1] = UI_TILE_DIGIT_OV2_0 + digit_tens[earth];
-    r[2] = UI_TILE_DIGIT_OV2_0 + digit_ones[earth];
-    set_win_tiles(0, 3, 3, 1, r);
-    r[0] = UI_TILE_ROUND_S2;
-    r[1] = UI_TILE_DIGIT_S2_0 + digit_tens[earth];
-    r[2] = UI_TILE_DIGIT_S2_0 + digit_ones[earth];
-    set_win_tiles(0, 4, 3, 1, r);
+    /* one counter per tile kind: colored dot + two digits */
+    for (k = 0; k < 4; k++) {
+        uint8_t n = kind_counts ? kind_counts[k] : 0;
+        if (n > 99) n = 99;
+        r[0] = UI_TILE_ROUND2;   /* fill shade = the gem's body color */
+        r[1] = UI_TILE_DIGIT_0 + digit_tens[n];
+        r[2] = UI_TILE_DIGIT_0 + digit_ones[n];
+        set_win_tiles(0, k, 3, 1, r);
+    }
 
     /* knowledge counter sprites: K + 4 digits (timer owns the
        slots when hidden — legacy bug-2 contract) */

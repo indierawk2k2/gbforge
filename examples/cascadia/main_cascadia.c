@@ -117,7 +117,7 @@ static void sync_state(void)
 {
     memcpy(board, eng.board, 64);
     score = eng.cleared_total * POINTS_PER_TILE;
-    rth_update(0, 0, 0, score);
+    rth_update(&eng.cleared_by_kind[1], score);
     rth_show_moves(moves_left);
 }
 
@@ -190,6 +190,7 @@ static void classic_run(void)
     memset(&eng.manna, 0, sizeof(eng.manna));
     eng.knowledge = 0;
     eng.cleared_total = 0;
+    memset(eng.cleared_by_kind, 0, sizeof(eng.cleared_by_kind));
     eng.max_tier = TILE_KINDS;      /* gems never transmute */
     eng.fx.chain_bonus_pct = 0;
     eng.rng = cx_rng;

@@ -73,10 +73,10 @@ What it builds from, measured:
 | Piece | Size | Written by |
 |---|---|---|
 | `cascadia.py` — the spec | 44 lines | you |
-| `main_cascadia.c` — input edges, score/move counters, win ladder | 281 lines | you (once per game; `gen_main` is the roadmap) |
+| `main_cascadia.c` — input edges, score/move counters, win ladder | 282 lines | you (once per game; `gen_main` is the roadmap) |
 | `generated/` — config tables from the spec | 130 lines, 8 files | gbforge |
-| `res/` — placeholder art pack (tiles, font, palettes, sprites) | 478 lines | `scripts/gen_placeholder_res.py` |
-| `runtime/` — the shared engine | 2,425 lines, 13 files | written once, shared by every game |
+| `res/` — placeholder art pack (tiles, font, palettes, sprites) | 666 lines | `scripts/gen_placeholder_res.py` |
+| `runtime/` — the shared engine | 2,413 lines, 13 files | written once, shared by every game |
 
 The generated output and the built ROM are **committed on purpose**,
 so you can read the before and after without installing a toolchain:
@@ -85,7 +85,8 @@ this, running in an emulator:
 
 <img src="examples/cascadia/screenshot@3x.png" width="480"
      alt="Cascadia gameplay: an 8x8 board of ruby, emerald, topaz,
-and onyx gems, score 120, 27 moves left, cursor mid-board">
+and onyx gems with per-gem clear counters, score 120, 27 moves
+left, cursor mid-board">
 
 *(3× scale of [the raw 160×144 capture](examples/cascadia/screenshot.png);
 the art is generated placeholder by design.)*

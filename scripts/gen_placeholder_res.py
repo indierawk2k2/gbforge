@@ -192,8 +192,13 @@ def solid(color):
 
 
 def rounded(color):
-    g = blank(color)
-    for x, y in ((0, 0), (7, 0), (0, 7), (7, 7)):
+    """7x7 rounded block: the last row and column stay clear so
+    vertically stacked counters keep a 1px gap."""
+    g = blank()
+    for y in range(7):
+        for x in range(7):
+            g[y][x] = color
+    for x, y in ((0, 0), (6, 0), (0, 6), (6, 6)):
         g[y][x] = 0
     return g
 
@@ -211,12 +216,13 @@ def vline(col, color=3):
     return g
 
 
-def corner(top, left, color=3):
+def joint(hrow, vcol, color=3):
+    """Corner tile: horizontal arm on hrow, vertical arm on vcol —
+    rows/columns chosen to meet the adjacent border-line tiles."""
     g = blank()
-    g[0 if top else 7] = [color] * 8
+    g[hrow] = [color] * 8
     for y in range(8):
-        g[y][0 if left else 7] = color
-    g[0 if top else 7][0 if left else 7] = 0   # notch
+        g[y][vcol] = color
     return g
 
 
@@ -408,12 +414,15 @@ def main():
     ui[48] = bracket(True); ui[49] = bracket(False)
     ui[50] = hline(6); ui[51] = hline(1)
     ui[52] = vline(6); ui[53] = vline(1)
-    ui[54] = corner(True, True); ui[55] = corner(True, False)
-    ui[56] = corner(False, True); ui[57] = corner(False, False)
+    # frame corners join BORDER_TOP/BOT (rows 6/1) and LEFT/RIGHT
+    # (cols 6/1)
+    ui[54] = joint(6, 6); ui[55] = joint(6, 1)
+    ui[56] = joint(1, 6); ui[57] = joint(1, 1)
     ui[58] = solid(3)
     ui[59] = rounded(2); ui[60] = rounded(3)
-    ui[61] = corner(True, True); ui[62] = corner(True, False)
-    ui[63] = corner(False, True); ui[64] = corner(False, False)
+    # overlay corners join OVL borders (rows 7/0, cols 7/0)
+    ui[61] = joint(7, 7); ui[62] = joint(7, 0)
+    ui[63] = joint(0, 7); ui[64] = joint(0, 0)
     ui[66] = tri(True, 1); ui[67] = tri(False, 1)
     ui[68] = rounded(2); ui[69] = rounded(2)
     ui[70] = rounded(2); ui[71] = rounded(2)

@@ -29,9 +29,9 @@
  * Call between DISPLAY_OFF/ON with tiles already loaded. */
 void rth_init(void) BANKED;
 
-/* Refresh the manna sidebar + knowledge counter. */
-void rth_update(uint8_t fire, uint8_t water, uint8_t earth,
-                uint16_t knowledge) BANKED;
+/* Sidebar refresh: four per-kind counters (kind_counts[0..3],
+ * NULL = zeros) and the score readout. */
+void rth_update(const uint8_t *kind_counts, uint16_t kp) BANKED;
 
 /* Timed modes reuse the knowledge sprite slots for the countdown:
  * hide the counter first, then feed frames-left each tick. */

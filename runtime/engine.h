@@ -89,6 +89,8 @@ typedef struct {
     uint16_t cleared_total;       /* tiles cleared, lifetime — a
                                      generic score source for games
                                      without resource pools */
+    uint8_t cleared_by_kind[RT_TILE_TYPES];  /* per-kind clears,
+                                     saturating at 255 (HUD counters) */
 
     uint8_t last_max_run;
 

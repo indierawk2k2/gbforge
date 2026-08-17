@@ -80,8 +80,15 @@ What it builds from, measured:
 
 The generated output and the built ROM are **committed on purpose**,
 so you can read the before and after without installing a toolchain:
-spec → [generated tables](examples/cascadia/generated/) →
-[screenshot](examples/cascadia/screenshot.png).
+the spec above → [generated tables](examples/cascadia/generated/) →
+this, running in an emulator:
+
+<img src="examples/cascadia/screenshot@3x.png" width="480"
+     alt="Cascadia gameplay: an 8x8 board of ruby, emerald, topaz,
+and onyx gems, score 120, 27 moves left, cursor mid-board">
+
+*(3× scale of [the raw 160×144 capture](examples/cascadia/screenshot.png);
+the art is generated placeholder by design.)*
 
 ## How it works
 

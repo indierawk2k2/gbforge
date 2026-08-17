@@ -15,7 +15,8 @@ points wins; 30 moves is all you get.
 1. `cascadia.py` — every tuning knob the game has.
 2. `generated/` — what gbforge emits from it: pure `const` data.
 3. `main_cascadia.c` — the wiring; note how little game is in it.
-4. `screenshot.png` — the result running in an emulator.
+4. `screenshot.png` — the result running in an emulator
+   (`screenshot@3x.png` is the same frame scaled for reading).
 
 The art in `res/` and `art/` is generated placeholder
 (`../../scripts/gen_placeholder_res.py`): flat-colored gems with

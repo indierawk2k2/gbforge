@@ -1,0 +1,163 @@
+{
+ "mirror_symbol": "anim_params",
+ "rom_symbol": "anim_params_rom",
+ "fields": [
+  {
+   "name": "flash_hold",
+   "offset": 0,
+   "count": 1,
+   "default": 8,
+   "min": 0,
+   "max": 60
+  },
+  {
+   "name": "clear_hold",
+   "offset": 1,
+   "count": 1,
+   "default": 6,
+   "min": 0,
+   "max": 60
+  },
+  {
+   "name": "pass_gap",
+   "offset": 2,
+   "count": 1,
+   "default": 5,
+   "min": 0,
+   "max": 60
+  },
+  {
+   "name": "gravity_delay",
+   "offset": 3,
+   "count": 8,
+   "default": [
+    3,
+    2,
+    2,
+    1,
+    1,
+    1,
+    1,
+    1
+   ],
+   "min": 1,
+   "max": 12
+  },
+  {
+   "name": "swap_frames",
+   "offset": 11,
+   "count": 1,
+   "default": 6,
+   "min": 1,
+   "max": 16
+  },
+  {
+   "name": "swap_curve",
+   "offset": 12,
+   "count": 16,
+   "default": [
+    2,
+    4,
+    7,
+    10,
+    13,
+    16,
+    16,
+    16,
+    16,
+    16,
+    16,
+    16,
+    16,
+    16,
+    16,
+    16
+   ],
+   "min": 0,
+   "max": 16
+  },
+  {
+   "name": "shake_frames",
+   "offset": 28,
+   "count": 1,
+   "default": 7,
+   "min": 0,
+   "max": 8
+  },
+  {
+   "name": "shake_dx",
+   "offset": 29,
+   "count": 8,
+   "default": [
+    -1,
+    1,
+    -1,
+    1,
+    -1,
+    -1,
+    0,
+    0
+   ],
+   "min": -4,
+   "max": 4
+  },
+  {
+   "name": "shake_dy",
+   "offset": 37,
+   "count": 8,
+   "default": [
+    -1,
+    -1,
+    1,
+    1,
+    -1,
+    1,
+    0,
+    0
+   ],
+   "min": -4,
+   "max": 4
+  },
+  {
+   "name": "sparkle_frames",
+   "offset": 45,
+   "count": 1,
+   "default": 6,
+   "min": 1,
+   "max": 30
+  },
+  {
+   "name": "wiggle_steps",
+   "offset": 46,
+   "count": 1,
+   "default": 6,
+   "min": 0,
+   "max": 8
+  },
+  {
+   "name": "wiggle_step_frames",
+   "offset": 47,
+   "count": 1,
+   "default": 5,
+   "min": 1,
+   "max": 30
+  },
+  {
+   "name": "wiggle_offsets",
+   "offset": 48,
+   "count": 8,
+   "default": [
+    1,
+    -1,
+    1,
+    -1,
+    1,
+    0,
+    0,
+    0
+   ],
+   "min": -4,
+   "max": 4
+  }
+ ]
+}

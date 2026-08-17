@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gbforge"
+version = "0.1.0"
+description = "A declarative model for tile-based puzzle games that compiles to Game Boy Color code at build time"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "Apache-2.0" }
+
+[tool.setuptools.packages.find]
+include = ["gbforge*"]

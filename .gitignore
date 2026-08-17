@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+obj/
+obj_debug/
+*.noi
+*.map
+*.ihx
+*.lst
+*.sym
+*.o
+/gbdk
+.DS_Store

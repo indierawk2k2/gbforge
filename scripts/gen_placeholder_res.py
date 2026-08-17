@@ -216,13 +216,21 @@ def vline(col, color=3):
     return g
 
 
-def joint(hrow, vcol, color=3):
-    """Corner tile: horizontal arm on hrow, vertical arm on vcol —
-    rows/columns chosen to meet the adjacent border-line tiles."""
+def corner_l(hrow, vcol, hdir, vdir, notch=True, color=3):
+    """Corner tile: an L, not a cross. The horizontal arm runs from
+    the elbow toward the adjacent border tile (hdir: +1 right,
+    -1 left), the vertical arm likewise (vdir: +1 down, -1 up), and
+    both STOP at the elbow — nothing overhangs the joint. The elbow
+    pixel is notched (cleared) for the house corner style."""
     g = blank()
-    g[hrow] = [color] * 8
-    for y in range(8):
+    xs = range(vcol, 8) if hdir > 0 else range(0, vcol + 1)
+    for x in xs:
+        g[hrow][x] = color
+    ys = range(hrow, 8) if vdir > 0 else range(0, hrow + 1)
+    for y in ys:
         g[y][vcol] = color
+    if notch:
+        g[hrow][vcol] = 0
     return g
 
 
@@ -415,14 +423,19 @@ def main():
     ui[50] = hline(6); ui[51] = hline(1)
     ui[52] = vline(6); ui[53] = vline(1)
     # frame corners join BORDER_TOP/BOT (rows 6/1) and LEFT/RIGHT
-    # (cols 6/1)
-    ui[54] = joint(6, 6); ui[55] = joint(6, 1)
-    ui[56] = joint(1, 6); ui[57] = joint(1, 1)
+    # (cols 6/1); arms point into the frame's interior sides
+    ui[54] = corner_l(6, 6, +1, +1)   # TL: arms right + down
+    ui[55] = corner_l(6, 1, -1, +1)   # TR: arms left + down
+    ui[56] = corner_l(1, 6, +1, -1)   # BL: arms right + up
+    ui[57] = corner_l(1, 1, -1, -1)   # BR: arms left + up
     ui[58] = solid(3)
     ui[59] = rounded(2); ui[60] = rounded(3)
-    # overlay corners join OVL borders (rows 7/0, cols 7/0)
-    ui[61] = joint(7, 7); ui[62] = joint(7, 0)
-    ui[63] = joint(0, 7); ui[64] = joint(0, 0)
+    # overlay corners join OVL borders (rows 7/0, cols 7/0) —
+    # sharp elbows (no notch), arms stop at the joint
+    ui[61] = corner_l(7, 7, +1, +1, notch=False)
+    ui[62] = corner_l(7, 0, -1, +1, notch=False)
+    ui[63] = corner_l(0, 7, +1, -1, notch=False)
+    ui[64] = corner_l(0, 0, -1, -1, notch=False)
     ui[66] = tri(True, 1); ui[67] = tri(False, 1)
     ui[68] = rounded(2); ui[69] = rounded(2)
     ui[70] = rounded(2); ui[71] = rounded(2)

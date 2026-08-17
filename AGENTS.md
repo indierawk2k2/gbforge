@@ -79,6 +79,15 @@ reads and button injection:
   returns to 0, read `_score`/`_board`, assert. That is the entire
   verification pattern; it needs no game-specific tooling.
 
+- **Frame geometry is checked, not eyeballed.**
+  `scripts/check_frame_geometry.py <shot.png> --rect x0,y0,x1,y1`
+  asserts a screenshot's border renders as a clean rectangle: every
+  edge continuous, and no line pixels overhanging past a corner —
+  the defect class where a corner tile's arm crosses the joint.
+  Intentional overlaps (a portrait breaking a dialogue border) are
+  declared with `--allow x0,y0,x1,y1`, never silently accepted. The
+  committed Cascadia screenshot passes with `--rect 1,1,132,132`
+  and zero allows; keep it that way when retaking it.
 - **Bank discipline is a build gate.** `scripts/check_banks.py` runs
   on every link and fails the build if any linked area or symbol
   falls outside its ROM bank window. The linker is silent about this

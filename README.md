@@ -3,9 +3,10 @@
 A declarative model for tile-based puzzle games that compiles to Game
 Boy Color code at build time.
 
-You describe the game — modes, rules data, animation timings, UI,
-win/lose overlays — in about forty lines of Python. gbforge turns
-that into the C configuration tables a shared, hand-tuned runtime
+You declare the game's presentation and policy — modes and their
+refill/shake rules, every animation timing, the UI overlays, the
+title screen — in about forty lines of Python. gbforge turns that
+into the C configuration tables a shared, hand-tuned runtime
 consumes, and the result links into a ROM that runs on an 8-bit CPU
 with 8KB of work RAM and bank-switched ROM.
 
@@ -21,7 +22,16 @@ That constraint binds at runtime, not at build time. gbforge resolves
 the abstraction while compiling: the model becomes constant tables,
 and the runtime that interprets them is written once, by hand, against
 the hardware's real timing windows. The hardware never pays for the
-expressiveness; adding a game costs a spec, not an engine.
+expressiveness.
+
+The division of labor is deliberate, so here it is precisely: the
+**spec** declares presentation, animation, and mode policy; board
+geometry and the match/gravity/cascade resolution loop live in the
+**shared runtime**; and a thin **per-game C entry point** (282 lines
+in the example) wires input edges, score and move counters, and the
+win/lose ladder to both. The second game costs 44 lines of spec plus
+a ~280-line loop instead of a 2,413-line engine — and every timing
+and layout decision stays declarative and hot-tunable.
 
 The reason to do this now is economic. With coding agents doing
 implementation under specification and review, one person can carry a
@@ -35,7 +45,9 @@ practice.
 
 `examples/cascadia/` is a complete match-3: swap-to-match, gravity,
 refills, cascade chains, 10 points a tile, win at 1000, lose after 30
-moves. The gameplay-shaped part is [44 lines of Python](examples/cascadia/cascadia.py):
+moves. Its declarative surface is [44 lines of Python](examples/cascadia/cascadia.py)
+(the score/move rules themselves live in the 282-line per-game loop —
+see the table below for exactly who writes what):
 
 ```python
 GAME = Game(

@@ -246,8 +246,12 @@ static void classic_run(void)
                 if ((pressed & J_LEFT) && cursor_x > 0) x2--;
                 if ((pressed & J_RIGHT) && cursor_x < 7) x2++;
                 if (x2 != cursor_x || y2 != cursor_y) {
+                    uint8_t x1 = cursor_x, y1 = cursor_y;
                     tile_selected = 0;
-                    if (do_swap(cursor_x, cursor_y, x2, y2)) return;
+                    /* the bracket rides with the grabbed piece */
+                    cursor_x = x2;
+                    cursor_y = y2;
+                    if (do_swap(x1, y1, x2, y2)) return;
                 }
             }
         } else {

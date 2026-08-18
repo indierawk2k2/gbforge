@@ -2,7 +2,7 @@
  * semantics are the legacy cast_spell() behaviors, table-driven. */
 
 #ifdef __SDCC
-#pragma bank 1
+#pragma bank 3   /* bank 1 is the engine+animator's; casts are cold */
 #endif
 
 #include "ability.h"

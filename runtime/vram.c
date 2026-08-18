@@ -22,6 +22,8 @@ void rtv_load_game_gfx(void)
     set_bkg_data(UI_TILE_BASE, UI_TILE_COUNT, ui_tile_data);
     set_bkg_data(SPELL_ICON_TILE_BASE, SPELL_ICON_COUNT,
                  spell_icon_tile_data);
+    set_bkg_data(GHOST_TILE_BASE, TOTAL_GAME_HW_TILES,
+                 ghost_tile_data);   /* refill drop-in transit tiles */
     set_sprite_data(0, CURSOR_TOTAL_TILES, cursor_sprite_data);
     set_sprite_data(KNOWLEDGE_TILE_BASE, KNOWLEDGE_TOTAL_TILES,
                     knowledge_sprite_data);

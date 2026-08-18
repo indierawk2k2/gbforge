@@ -491,6 +491,12 @@ def main():
         f.write(emit_tiles("ui_tile_data", ui))
         f.write(emit_tiles("spell_icon_tile_data", icons))
         f.write(emit_tiles("title_logo_tiles", logo_tiles))
+        # ghost variants: refill drop-in transit tiles (fade map
+        # 3->2, 2->1, matching the private pack's derivation)
+        fade = {0: 0, 1: 1, 2: 1, 3: 2}
+        ghosts = [[[fade[v] for v in row] for row in t]
+                  for t in game_tiles]
+        f.write(emit_tiles("ghost_tile_data", ghosts))
         f.write(f"const uint8_t tile_palette_map[][4] = {{\n")
         for row in pal_map:
             f.write("    { " + ", ".join(str(v) for v in row) + " },\n")
@@ -520,6 +526,11 @@ def main():
         f.write("};\n")
 
     n_logo = len(logo)
+    # ghosts SHARE the logo's tile range: the logo lives only on the
+    # title screen and ghosts only in gameplay — each screen's gfx
+    # load overwrites the other's slice.
+    ghost_base = 48 + len(ui) + len(icons)
+    assert ghost_base + 48 <= 256, "ghost tiles overflow the tile index space"
     headers = {
         "tiles_data.h": f"""{hdr}#ifndef TILES_DATA_H
 #define TILES_DATA_H
@@ -558,6 +569,13 @@ def main():
 #define UI_TILE_CORNER_BR    (UI_TILE_BASE + 57)
 #define UI_TILE_SOLID3       (UI_TILE_BASE + 58)
 #define UI_TILE_ROUND2       (UI_TILE_BASE + 59)
+
+/* Ghost (faded) game-tile variants: refill drop-in transit tiles.
+ * Shares the title logo's tile range ({ghost_base}+): the logo is
+ * title-only and ghosts are game-only; each screen's gfx load
+ * overwrites the other's slice. */
+#define GHOST_TILE_BASE {ghost_base}
+#define HW_TILE_BASE_GHOST(type) (GHOST_TILE_BASE + (type) * HW_TILES_PER_LOGICAL)
 #define UI_TILE_ROUND3       (UI_TILE_BASE + 60)
 #define UI_TILE_OVL_CORNER_TL (UI_TILE_BASE + 61)
 #define UI_TILE_OVL_CORNER_TR (UI_TILE_BASE + 62)
@@ -586,6 +604,7 @@ def main():
 extern const uint8_t tile_data[];
 extern const uint8_t ui_tile_data[];
 extern const uint8_t spell_icon_tile_data[];
+extern const uint8_t ghost_tile_data[];
 extern const uint8_t tile_palette_map[][4];
 
 #endif

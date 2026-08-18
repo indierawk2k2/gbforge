@@ -38,6 +38,13 @@
 #define UI_TILE_CORNER_BR    (UI_TILE_BASE + 57)
 #define UI_TILE_SOLID3       (UI_TILE_BASE + 58)
 #define UI_TILE_ROUND2       (UI_TILE_BASE + 59)
+
+/* Ghost (faded) game-tile variants: refill drop-in transit tiles.
+ * Shares the title logo's tile range (188+): the logo is
+ * title-only and ghosts are game-only; each screen's gfx load
+ * overwrites the other's slice. */
+#define GHOST_TILE_BASE 188
+#define HW_TILE_BASE_GHOST(type) (GHOST_TILE_BASE + (type) * HW_TILES_PER_LOGICAL)
 #define UI_TILE_ROUND3       (UI_TILE_BASE + 60)
 #define UI_TILE_OVL_CORNER_TL (UI_TILE_BASE + 61)
 #define UI_TILE_OVL_CORNER_TR (UI_TILE_BASE + 62)
@@ -66,6 +73,7 @@
 extern const uint8_t tile_data[];
 extern const uint8_t ui_tile_data[];
 extern const uint8_t spell_icon_tile_data[];
+extern const uint8_t ghost_tile_data[];
 extern const uint8_t tile_palette_map[][4];
 
 #endif

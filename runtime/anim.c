@@ -378,17 +378,139 @@ void rta_play(const rt_engine *e) BANKED
         step++;
     }
 
-    /* 4) refills (endless modes) — reveal, then settle gap */
+    /* 4) refills (endless modes): the new tiles drop in from above
+       as ghost (faded) tiles, one row per step, exactly like legacy
+       render_refill_drop — never a pop-in. After landing, a short
+       ghost hold, then the real tiles reveal. */
     {
-        uint8_t any_refill = 0;
+        uint8_t empty_rows[8];
+        uint8_t max_empty = 0;
+
+        memset(empty_rows, 0, sizeof(empty_rows));
         for (i = 0; i < e->event_count; i++) {
             const rt_event *ev = &e->events[i];
             if (ev->type == RT_EV_REFILL) {
                 visual[ev->b][ev->a] = ev->c;
-                any_refill = 1;
+                empty_rows[ev->a]++;
             }
         }
-        if (any_refill) ngau_event(NGAU_EV_REFILL);
+        for (x = 0; x < 8; x++)
+            if (empty_rows[x] > max_empty) max_empty = empty_rows[x];
+
+        if (max_empty) {
+            ngau_event(NGAU_EV_REFILL);
+            for (step = 0; step < max_empty; step++) {
+                uint8_t visible_rows = step + 1;
+                uint8_t attr[32], tile[32];
+
+                /* HALF-STEP: the falling group straddles cells */
+                rtv_stage_reset();
+                for (y = 0; y <= step; y++) {
+                    for (x = 0; x < 8; x++) {
+                        uint8_t col_active =
+                            (empty_rows[x] >= visible_rows);
+                        uint8_t vis = col_active
+                            ? (uint8_t)(empty_rows[x] - visible_rows)
+                            : 0;
+                        uint8_t in_transit =
+                            col_active && (y + vis < empty_rows[x]);
+                        uint8_t t, base;
+
+                        if (in_transit) {
+                            /* top hw-row: bottom half of the tile
+                               arriving from above (ghost) */
+                            t = visual[y + vis][x];
+                            base = HW_TILE_BASE_GHOST(t);
+                            tile[(x << 1)] = base + 2;
+                            tile[(x << 1) + 1] = base + 3;
+                            attr[(x << 1)] = tile_palette_map[t][0];
+                            attr[(x << 1) + 1] = tile_palette_map[t][0];
+                            if (y + vis + 1 < empty_rows[x]) {
+                                t = visual[y + vis + 1][x];
+                                base = HW_TILE_BASE_GHOST(t);
+                                tile[16 + (x << 1)] = base;
+                                tile[16 + (x << 1) + 1] = base + 1;
+                                attr[16 + (x << 1)] =
+                                    tile_palette_map[t][0];
+                                attr[16 + (x << 1) + 1] =
+                                    tile_palette_map[t][0];
+                            } else {
+                                base = HW_TILE_BASE(RT_EMPTY);
+                                tile[16 + (x << 1)] = base + 2;
+                                tile[16 + (x << 1) + 1] = base + 3;
+                                attr[16 + (x << 1)] =
+                                    tile_palette_map[RT_EMPTY][0];
+                                attr[16 + (x << 1) + 1] =
+                                    tile_palette_map[RT_EMPTY][0];
+                            }
+                        } else {
+                            t = visual[y][x];
+                            base = HW_TILE_BASE(t);
+                            tile[(x << 1)] = base;
+                            tile[(x << 1) + 1] = base + 1;
+                            tile[16 + (x << 1)] = base + 2;
+                            tile[16 + (x << 1) + 1] = base + 3;
+                            attr[(x << 1)] = tile_palette_map[t][0];
+                            attr[(x << 1) + 1] = tile_palette_map[t][1];
+                            attr[16 + (x << 1)] = tile_palette_map[t][2];
+                            attr[16 + (x << 1) + 1] =
+                                tile_palette_map[t][3];
+                        }
+                    }
+                    rtv_stage_row(y, attr, tile);
+                }
+                vsync();
+                rtv_blast();
+                FRAME_HOOK();
+
+                /* FULL-STEP: group lands one row lower (transit
+                   cells still ghost; palettes unified per legacy) */
+                rtv_stage_reset();
+                for (y = 0; y <= step; y++) {
+                    for (x = 0; x < 8; x++) {
+                        uint8_t col_active =
+                            (empty_rows[x] >= visible_rows);
+                        uint8_t vis = col_active
+                            ? (uint8_t)(empty_rows[x] - visible_rows)
+                            : 0;
+                        uint8_t t, base, pal, use_ghost;
+
+                        if (y + vis < empty_rows[x]) {
+                            t = visual[y + vis][x];
+                            use_ghost = col_active;
+                        } else if (y < empty_rows[x]) {
+                            t = RT_EMPTY;
+                            use_ghost = 0;
+                        } else {
+                            t = visual[y][x];
+                            use_ghost = 0;
+                        }
+                        base = use_ghost ? HW_TILE_BASE_GHOST(t)
+                                         : HW_TILE_BASE(t);
+                        pal = tile_palette_map[t][0];
+                        tile[(x << 1)] = base;
+                        tile[(x << 1) + 1] = base + 1;
+                        tile[16 + (x << 1)] = base + 2;
+                        tile[16 + (x << 1) + 1] = base + 3;
+                        attr[(x << 1)] = pal;
+                        attr[(x << 1) + 1] = pal;
+                        attr[16 + (x << 1)] = pal;
+                        attr[16 + (x << 1) + 1] = pal;
+                    }
+                    rtv_stage_row(y, attr, tile);
+                }
+                vsync();
+                rtv_blast();
+                FRAME_HOOK();
+                {
+                    uint8_t d = RTA_PARAMS->gravity_delay[
+                        step > 7 ? 7 : step];
+                    if (d > 1) wait_frames(d - 1);
+                }
+            }
+            /* ghost hold, then reveal the real tiles */
+            wait_frames(8);
+        }
     }
     vsync();
     rtv_blit_board(visual);

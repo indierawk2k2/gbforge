@@ -43,7 +43,7 @@ $(OBJ):
 	@mkdir -p $@
 
 debug:
-	$(MAKE) DEBUG=1 all
+	@$(MAKE) DEBUG=1 all || exit 1
 
 gen:
 	cd $(ROOT) && python3 -m gbforge build examples/cascadia \

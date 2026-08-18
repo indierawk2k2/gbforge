@@ -446,6 +446,46 @@ uint8_t rt_find_hint(rt_engine *e, uint8_t *hx, uint8_t *hy) BANKED
     return 0;
 }
 
+uint8_t rt_find_hint_swap(rt_engine *e,
+                          uint8_t *x1, uint8_t *y1,
+                          uint8_t *x2, uint8_t *y2) BANKED
+{
+    uint8_t x, y, tmp;
+    for (y = 0; y < RT_H; y++) {
+        for (x = 0; x < RT_W; x++) {
+            if (x < RT_W - 1) {
+                tmp = e->board[y][x];
+                e->board[y][x] = e->board[y][x + 1];
+                e->board[y][x + 1] = tmp;
+                if (check_match_at(e, x, y) ||
+                    check_match_at(e, x + 1, y)) {
+                    e->board[y][x + 1] = e->board[y][x];
+                    e->board[y][x] = tmp;
+                    *x1 = x; *y1 = y; *x2 = x + 1; *y2 = y;
+                    return 1;
+                }
+                e->board[y][x + 1] = e->board[y][x];
+                e->board[y][x] = tmp;
+            }
+            if (y < RT_H - 1) {
+                tmp = e->board[y][x];
+                e->board[y][x] = e->board[y + 1][x];
+                e->board[y + 1][x] = tmp;
+                if (check_match_at(e, x, y) ||
+                    check_match_at(e, x, y + 1)) {
+                    e->board[y + 1][x] = e->board[y][x];
+                    e->board[y][x] = tmp;
+                    *x1 = x; *y1 = y; *x2 = x; *y2 = y + 1;
+                    return 1;
+                }
+                e->board[y + 1][x] = e->board[y][x];
+                e->board[y][x] = tmp;
+            }
+        }
+    }
+    return 0;
+}
+
 uint8_t rt_count_moves(const rt_engine *e) BANKED
 {
     uint8_t x, y, tmp, count = 0;

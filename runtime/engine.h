@@ -106,6 +106,13 @@ typedef struct {
 
 void rt_init(rt_engine *e) BANKED;
 
+/* First legal swap on the board (the same one the hint wiggle
+   points at). Fast: early-out scan, no scoring. Returns 0 when the
+   board is move-less. */
+uint8_t rt_find_hint_swap(rt_engine *e,
+                          uint8_t *x1, uint8_t *y1,
+                          uint8_t *x2, uint8_t *y2) BANKED;
+
 /* match_find: mark runs, set last_max_run. Returns 1 if any. */
 uint8_t rt_find(rt_engine *e) BANKED;
 

@@ -39,4 +39,15 @@ void rtc_draw(uint8_t frame, uint8_t mode) BANKED;
 /* Invalidate caches (call after DISPLAY_OFF screen rebuilds). */
 void rtc_invalidate(void) BANKED;
 
+/* Ghost hint cursors (legacy render_hint_cursors): two translucent-
+ * looking brackets at the suggested swap pair — gray, or red when
+ * unsolvable. Uses GHOST_CURSOR_A_BASE (aliases the knowledge
+ * sprites) and GHOST_CURSOR_B_BASE (aliases the moves counter);
+ * callers repair those HUD elements after rtc_hint_hide. */
+void rtc_hint_palettes(void) BANKED;   /* load gray + red OBJ pals */
+void rtc_hint_cursors(uint8_t x1, uint8_t y1,
+                      uint8_t x2, uint8_t y2,
+                      uint8_t unsolvable) BANKED;
+void rtc_hint_hide(void) BANKED;
+
 #endif

@@ -25,9 +25,9 @@ GAME = Game(
         Mode("classic", refill=True, shake_run=4, shake_passes=2),
     ],
     overlays=[
-        Overlay("win", pos=(4, 6), size=(12, 5),
+        Overlay("win", pos=(3, 6), size=(14, 5),
                 lines=[(1, "YOU WIN"), (2, "1000 POINTS")]),
-        Overlay("lose", pos=(4, 6), size=(12, 5),
+        Overlay("lose", pos=(3, 6), size=(14, 5),
                 lines=[(1, "GAME OVER"), (2, "OUT OF MOVES")]),
     ],
     animations=BoardAnimations(

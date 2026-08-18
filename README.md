@@ -30,7 +30,7 @@ geometry and the match/gravity/cascade resolution loop live in the
 **shared runtime**; and a thin **per-game C entry point** (282 lines
 in the example) wires input edges, score and move counters, and the
 win/lose ladder to both. The second game costs 44 lines of spec plus
-a ~280-line loop instead of a 2,413-line engine — and every timing
+a ~280-line loop instead of a 2,519-line engine — and every timing
 and layout decision stays declarative and hot-tunable.
 
 The reason to do this now is economic. With coding agents doing
@@ -87,8 +87,8 @@ What it builds from, measured:
 | `cascadia.py` — the spec | 44 lines | you |
 | `main_cascadia.c` — input edges, score/move counters, win ladder | 282 lines | you (once per game; `gen_main` is the roadmap) |
 | `generated/` — config tables from the spec | 130 lines, 8 files | gbforge |
-| `res/` — placeholder art pack (tiles, font, palettes, sprites) | 666 lines | `scripts/gen_placeholder_res.py` |
-| `runtime/` — the shared engine | 2,413 lines, 13 files | written once, shared by every game |
+| `res/` — placeholder art pack (tiles, font, palettes, sprites) | 668 lines | `scripts/gen_placeholder_res.py` |
+| `runtime/` — the shared engine | 2,519 lines, 13 files | written once, shared by every game |
 
 The generated output and the built ROM are **committed on purpose**,
 so you can read the before and after without installing a toolchain:

@@ -10,7 +10,7 @@ static const ng_overlay_line lines_win[2] = {
     { 2, "1000 POINTS" }
 };
 const ng_overlay ovl_win = {
-    { 4, 6, 12, 5,
+    { 3, 6, 14, 5,
       PAL_SILVER,
       UI_TILE_OVL_BORDER_TOP, UI_TILE_OVL_BORDER_BOT,
       UI_TILE_OVL_BORDER_LEFT, UI_TILE_OVL_BORDER_RIGHT,
@@ -26,7 +26,7 @@ static const ng_overlay_line lines_lose[2] = {
     { 2, "OUT OF MOVES" }
 };
 const ng_overlay ovl_lose = {
-    { 4, 6, 12, 5,
+    { 3, 6, 14, 5,
       PAL_SILVER,
       UI_TILE_OVL_BORDER_TOP, UI_TILE_OVL_BORDER_BOT,
       UI_TILE_OVL_BORDER_LEFT, UI_TILE_OVL_BORDER_RIGHT,

@@ -57,6 +57,26 @@ def _overlay_body(o):
 def emit(game, out_dir):
     os.makedirs(out_dir, exist_ok=True)
     overlays = getattr(game, "overlays", [])
+
+    # Build gates. Overflowing text writes tilemap entries past the
+    # box border, and overlays are restored by re-blitting the 8x8
+    # board (bg tiles 1..16) — anything outside that rect is
+    # stranded on screen after dismissal.
+    for o in overlays:
+        interior = o.size[0] - 2          # tile font: 1 tile/char
+        for _dy, text in o.lines:
+            if len(text) > interior:
+                raise SystemExit(
+                    f"gen_ui: overlay '{o.name}' line '{text}' is "
+                    f"{len(text)} tiles but the box interior is "
+                    f"{interior} — widen the box or shorten the text")
+        x0, y0 = o.pos
+        x1, y1 = x0 + o.size[0], y0 + o.size[1]
+        if x0 < 1 or y0 < 1 or x1 > 17 or y1 > 17:
+            raise SystemExit(
+                f"gen_ui: overlay '{o.name}' box ({x0},{y0})-"
+                f"({x1 - 1},{y1 - 1}) leaves the restorable board "
+                f"rect (1,1)-(16,16)")
     externs = "".join(
         f"extern const ng_overlay ovl_{o.name};\n" for o in overlays)
     bodies = "\n".join(_overlay_body(o) for o in overlays)

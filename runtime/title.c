@@ -1,7 +1,7 @@
 /* gbforge runtime — title screen + arrow menu. See title.h. */
 
 #ifdef __SDCC
-#pragma bank 1
+#pragma bank 2   /* bank 1 is the engine's; the title screen is cold */
 #endif
 
 #include <gb/gb.h>

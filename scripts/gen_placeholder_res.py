@@ -630,6 +630,8 @@ extern const uint8_t tile_palette_map[][4];
 #define CHAIN_TOTAL_TILES 28
 
 #define HINT_SPRITE_BASE 36
+#define GHOST_CURSOR_A_BASE 4    /* hint bracket A: aliases knowledge */
+#define GHOST_CURSOR_B_BASE 36   /* hint bracket B: aliases hint/moves */
 #define HINT_SPRITE_COUNT 4
 #define HINT_TILE_BASE 51
 

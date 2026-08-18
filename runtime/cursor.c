@@ -140,3 +140,50 @@ void rtc_draw(uint8_t frame, uint8_t mode) BANKED
                     tile_x + 11 + 8 - inset, tile_y + 10 + 16 - inset);
     }
 }
+
+/* ── ghost hint cursors (legacy render_hint_cursors port) ────── */
+
+void rtc_hint_palettes(void) BANKED
+{
+    uint16_t pal_hint[4] = { RGB(0, 0, 0), RGB(18, 18, 18),
+                             RGB(10, 10, 10), RGB(0, 0, 0) };
+    uint16_t pal_unsolv[4] = { RGB(0, 0, 0), RGB(31, 6, 6),
+                               RGB(22, 4, 4), RGB(0, 0, 0) };
+    set_sprite_palette(PAL_GHOST_HINT, 1, pal_hint);
+    set_sprite_palette(PAL_GHOST_UNSOLVABLE, 1, pal_unsolv);
+}
+
+static void ghost_bracket(uint8_t base, uint8_t gx, uint8_t gy,
+                          uint8_t pal)
+{
+    uint8_t tx = (uint8_t)((gx << 4) + SCREEN_OFF);
+    uint8_t ty = (uint8_t)((gy << 4) + SCREEN_OFF);
+    uint8_t i;
+
+    for (i = 0; i < 4; i++) {
+        set_sprite_tile(base + i, CURSOR_TILE_NORMAL + i);
+        set_sprite_prop(base + i, pal);
+    }
+    move_sprite(base,     tx - 3 + 8,  ty - 2 + 16);
+    move_sprite(base + 1, tx + 11 + 8, ty - 2 + 16);
+    move_sprite(base + 2, tx - 3 + 8,  ty + 10 + 16);
+    move_sprite(base + 3, tx + 11 + 8, ty + 10 + 16);
+}
+
+void rtc_hint_cursors(uint8_t x1, uint8_t y1,
+                      uint8_t x2, uint8_t y2,
+                      uint8_t unsolvable) BANKED
+{
+    uint8_t pal = unsolvable ? PAL_GHOST_UNSOLVABLE : PAL_GHOST_HINT;
+    ghost_bracket(GHOST_CURSOR_A_BASE, x1, y1, pal);
+    ghost_bracket(GHOST_CURSOR_B_BASE, x2, y2, pal);
+}
+
+void rtc_hint_hide(void) BANKED
+{
+    uint8_t i;
+    for (i = 0; i < 4; i++) {
+        move_sprite(GHOST_CURSOR_A_BASE + i, 0, 0);
+        move_sprite(GHOST_CURSOR_B_BASE + i, 0, 0);
+    }
+}

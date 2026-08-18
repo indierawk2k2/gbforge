@@ -4,7 +4,7 @@
    (see engine.h) so they live outside HOME, which the ng ROM
    nearly filled. Host builds ignore this. */
 #ifdef __SDCC
-#pragma bank 1
+#pragma bank 2   /* bank 1 is at capacity in both trees */
 #endif
 
 #include "engine.h"

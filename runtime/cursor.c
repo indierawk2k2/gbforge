@@ -145,10 +145,17 @@ void rtc_draw(uint8_t frame, uint8_t mode) BANKED
 
 void rtc_hint_palettes(void) BANKED
 {
+    uint16_t pal_opp[4] = { RGB(0, 0, 0), RGB(31, 6, 6),
+                            RGB(22, 4, 4), RGB(0, 0, 0) };
     uint16_t pal_hint[4] = { RGB(0, 0, 0), RGB(18, 18, 18),
                              RGB(10, 10, 10), RGB(0, 0, 0) };
     uint16_t pal_unsolv[4] = { RGB(0, 0, 0), RGB(31, 6, 6),
                                RGB(22, 4, 4), RGB(0, 0, 0) };
+    /* slots 4-6 are exactly the palettes the hint wiggle borrows
+       for its ghost tile; reloading all three here makes this the
+       one restore point (PAL_CURSOR_OPPONENT doubles as the battle
+       CPU cursor and opponent-counter red) */
+    set_sprite_palette(PAL_CURSOR_OPPONENT, 1, pal_opp);
     set_sprite_palette(PAL_GHOST_HINT, 1, pal_hint);
     set_sprite_palette(PAL_GHOST_UNSOLVABLE, 1, pal_unsolv);
 }

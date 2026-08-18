@@ -14,6 +14,7 @@
 #include "engine.h"
 #include "anim.h"
 #include "sound_glue.h"
+#include "cursor.h"
 #ifdef DEBUG_BUILD
 #include "debug.h"
 #endif
@@ -234,6 +235,12 @@ void rta_play(const rt_engine *e) BANKED
                 }
             } else if (ev->type == RT_EV_AWARD_MANNA) {
                 spawn_float(ev->c >> 4, ev->c & 0x0F, ev->b);
+            } else if (ev->type == RT_EV_AWARD_KNOW) {
+                /* knowledge feedback: +N at the match (digit caps
+                   at 9; the K counter carries the exact total) */
+                uint8_t kp = ev->a;
+                if (ev->b || kp > 9) kp = 9;
+                spawn_float(ev->c >> 4, ev->c & 0x0F, kp);
             }
         }
         vsync();
@@ -586,6 +593,14 @@ void rta_play_wiggle(uint8_t gx, uint8_t gy) BANKED
         move_sprite(HINT_SPRITE_BASE + i, 0, 0);
     }
     rtv_blit_tile(gx, gy, tile_type);
+
+    /* the wiggle borrowed OBJ palettes 4-6 for the ghost tile:
+       restore them (opponent red + ghost grays) and force the
+       cursor to re-assert its own palette on the next draw —
+       otherwise the CPU cursor, the opponent counter, and the
+       hint brackets keep whatever gem colors the wiggle loaded */
+    rtc_hint_palettes();
+    rtc_invalidate();
 }
 
 /* ── sprite tile slide (legacy render_swap_anim mechanics) ── */

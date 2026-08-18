@@ -95,8 +95,11 @@ static void award(rt_engine *e, uint8_t tile, uint8_t run, uint8_t pos)
             kp += (kp * e->fx.knowledge_pct_bonus) / 100;
         }
         add_knowledge(e, kp);
+        /* c carries the award centroid (x<<4|y) so the animator can
+           float feedback at the match — knowledge awards used to be
+           visually silent, which read as "no points" */
         emit(e, RT_EV_AWARD_KNOW, (uint8_t)(kp & 0xFF),
-             (uint8_t)(kp >> 8), 0);
+             (uint8_t)(kp >> 8), pos);
     }
 }
 

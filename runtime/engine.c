@@ -18,12 +18,10 @@
 
 #include "engine.h"
 
-#define MANNA_CAP_DEFAULT 99
-#define KNOWLEDGE_CAP 9999u
-
-static const uint16_t knowledge_per_tier[RT_TILE_TYPES] = {
-    0, 0, 0, 0, 1, 3, 10, 25, 50, 100, 200, 500
-};
+/* All reward numbers come from the generated scoring tables
+   (gen_scoring; declared in the game definition) — one source for
+   every mode. scoring_config.c shares this bank. */
+#include "scoring_config.h" 
 
 static uint8_t check_match_at(rt_engine *e, uint8_t x, uint8_t y);
 
@@ -47,7 +45,7 @@ void rt_init(rt_engine *e) BANKED
 uint16_t rt_knowledge_for_tier(uint8_t tile) BANKED
 {
     if (tile >= RT_TILE_TYPES) return 0;
-    return knowledge_per_tier[tile];
+    return ng_knowledge_per_tier[tile];
 }
 
 uint8_t rt_next_tier(const rt_engine *e, uint8_t tile) BANKED
@@ -61,15 +59,12 @@ uint8_t rt_next_tier(const rt_engine *e, uint8_t tile) BANKED
 
 static uint8_t manna_for_run(uint8_t run)
 {
-    if (run >= 6) return 10;
-    if (run >= 5) return 7;
-    if (run >= 4) return 5;
-    return run;
+    return ng_manna_for_run[run > 8 ? 8 : run];
 }
 
 static void add_manna(rt_engine *e, uint8_t tile, uint8_t amount)
 {
-    uint8_t cap = e->fx.manna_cap ? e->fx.manna_cap : MANNA_CAP_DEFAULT;
+    uint8_t cap = e->fx.manna_cap ? e->fx.manna_cap : ng_manna_cap;
     uint8_t idx = tile - RT_MANNA_FIRST;
     if (tile < RT_MANNA_FIRST || tile > RT_MANNA_LAST) return;
     if ((uint16_t)e->manna[idx] + amount > cap) e->manna[idx] = cap;
@@ -78,7 +73,8 @@ static void add_manna(rt_engine *e, uint8_t tile, uint8_t amount)
 
 static void add_knowledge(rt_engine *e, uint16_t amount)
 {
-    if (e->knowledge + amount > KNOWLEDGE_CAP) e->knowledge = KNOWLEDGE_CAP;
+    if (e->knowledge + amount > ng_knowledge_cap)
+        e->knowledge = ng_knowledge_cap;
     else e->knowledge += amount;
 }
 
@@ -90,7 +86,7 @@ static void award(rt_engine *e, uint8_t tile, uint8_t run, uint8_t pos)
         add_manna(e, tile, amount);
         emit(e, RT_EV_AWARD_MANNA, tile, amount, pos);
     } else if (tile >= RT_METAL_FIRST && tile <= RT_METAL_LAST) {
-        uint16_t kp = knowledge_per_tier[tile] * run;
+        uint16_t kp = ng_knowledge_per_tier[tile] * run;
         if (e->fx.knowledge_pct_bonus > 0) {
             kp += (kp * e->fx.knowledge_pct_bonus) / 100;
         }

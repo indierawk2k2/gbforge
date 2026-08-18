@@ -22,7 +22,7 @@ INC = -I. -I$(RUNTIME) -I$(GEN) -I$(RES)
 
 RUNTIME_OBJS = engine vram anim flow ui_core hud title ability \
                reset cursor debug sound_glue_stub
-GEN_OBJS = mode_config ui_overlays anim_tables title_config
+GEN_OBJS = mode_config ui_overlays anim_tables title_config scoring_config
 RES_OBJS = tiles_data sprites_data palettes
 
 OBJS = $(OBJ)/main_cascadia.o \

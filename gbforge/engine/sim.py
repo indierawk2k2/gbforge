@@ -23,15 +23,20 @@ FIRE, WATER, EARTH = 1, 2, 3
 BRONZE, SILVER, GOLD, PLAT, EMERALD, RUBY, OBSID, AETHER = range(4, 12)
 TILE_TYPE_COUNT = 12
 
-MANNA_CAP = 99
-KNOWLEDGE_CAP = 9999
+# Reward numbers come from the shared Scoring model — the same
+# dataclass gen_scoring projects into the C tables.
+from gbforge.model.scoring import Scoring
+
+_SCORING = Scoring()
+MANNA_CAP = _SCORING.manna_cap
+KNOWLEDGE_CAP = _SCORING.knowledge_cap
 MAX_TRANSMUTES = 8
 
 _NEXT_TIER = {BRONZE: SILVER, SILVER: GOLD, GOLD: PLAT, PLAT: EMERALD,
               EMERALD: RUBY, RUBY: OBSID, OBSID: AETHER}
 
-_KNOWLEDGE = {BRONZE: 1, SILVER: 3, GOLD: 10, PLAT: 25,
-              EMERALD: 50, RUBY: 100, OBSID: 200, AETHER: 500}
+_KNOWLEDGE = {t: _SCORING.knowledge_per_tier[t]
+              for t in range(BRONZE, AETHER + 1)}
 
 
 def is_metal(t):
@@ -42,13 +47,7 @@ def is_manna(t):
 
 
 def manna_for_run(run):
-    if run >= 6:
-        return 10
-    if run >= 5:
-        return 7
-    if run >= 4:
-        return 5
-    return run
+    return _SCORING.manna_for_run[8 if run > 8 else run]
 
 
 class ItemEffects:

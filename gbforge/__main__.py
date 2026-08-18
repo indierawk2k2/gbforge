@@ -11,7 +11,7 @@ import os
 import sys
 
 from .codegen import (gen_abilities, gen_anim, gen_audio, gen_modes,
-                      gen_quest, gen_title, gen_ui)
+                      gen_quest, gen_scoring, gen_title, gen_ui)
 
 
 def _spec_path(game_dir):
@@ -44,6 +44,7 @@ def main(argv):
     game = _load_game(game_dir)
     emitted = []
     emitted += gen_modes.emit(game, out_dir)
+    emitted += gen_scoring.emit(game, out_dir)
     emitted += gen_ui.emit(game, out_dir)
     if game.animations is not None:
         emitted += gen_anim.emit(game, out_dir)

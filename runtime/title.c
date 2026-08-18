@@ -102,7 +102,7 @@ uint8_t rtt_show(const ng_title *t) BANKED
         }
 #endif
 
-        if (pressed & J_START) { ngau_event(NGAU_EV_MENU_CONFIRM); break; }
+        if (pressed & J_A) { ngau_event(NGAU_EV_MENU_CONFIRM); break; }
         if (pressed & (J_UP | J_DOWN | J_SELECT)) {
             ngau_event(NGAU_EV_MENU_MOVE);
             draw_arrow(&t->menu, sel, UI_TILE_BLANK);

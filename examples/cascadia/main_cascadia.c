@@ -134,7 +134,7 @@ static void overlay_wait(const ng_overlay *o)
         keys = joypad();
         pressed = keys & ~prev_keys;
         prev_keys = keys;
-        if (pressed & (J_A | J_START)) break;
+        if (pressed & J_A) break;   /* advance is always A */
 #ifdef DEBUG_BUILD
         if (debug_req != DBG_NONE) break;
 #endif

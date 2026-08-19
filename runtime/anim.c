@@ -87,9 +87,14 @@ static struct {
 } floats[MAX_FLOATING_NUMS];
 static uint8_t float_count;
 
+/* puzzle mode suppresses floats (no resource counters there) and
+   reuses their OAM slots for the "MOVE: XX" counter */
+uint8_t rta_floats_enabled = 1;
+
 static void spawn_float(uint8_t gx, uint8_t gy, uint8_t value)
 {
     uint8_t i, spr;
+    if (!rta_floats_enabled) return;
     for (i = 0; i < MAX_FLOATING_NUMS; i++) {
         if (floats[i].active) continue;
         floats[i].active = 1;

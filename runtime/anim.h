@@ -86,6 +86,7 @@ void rta_apply_shake(void) BANKED;
 
 /* Floating "+N" ticker — pumped by every wait and the main loop. */
 void rta_update_floats(void) BANKED;
+extern uint8_t rta_floats_enabled;
 
 /* Warning flash: whole board greyed/restored, cycles × hold (the
  * legacy no-moves punish cue: 3 × 10 frames). */

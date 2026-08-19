@@ -9,6 +9,7 @@
 #include <gb/cgb.h>
 
 #include "cursor.h"
+#include "vram.h"     /* rt_screen_off_x */
 #include "sprites_data.h"
 #include "palettes.h"
 
@@ -55,7 +56,7 @@ void rtc_invalidate(void) BANKED
 
 void rtc_draw(uint8_t frame, uint8_t mode) BANKED
 {
-    uint8_t tile_x = (uint8_t)cursor_px + SCREEN_OFF;
+    uint8_t tile_x = (uint8_t)cursor_px + rt_screen_off_x;
     uint8_t tile_y = (uint8_t)cursor_py + SCREEN_OFF;
     uint8_t tile_base;
     uint8_t pal = 0;
@@ -163,7 +164,7 @@ void rtc_hint_palettes(void) BANKED
 static void ghost_bracket(uint8_t base, uint8_t gx, uint8_t gy,
                           uint8_t pal)
 {
-    uint8_t tx = (uint8_t)((gx << 4) + SCREEN_OFF);
+    uint8_t tx = (uint8_t)((gx << 4) + rt_screen_off_x);
     uint8_t ty = (uint8_t)((gy << 4) + SCREEN_OFF);
     uint8_t i;
 

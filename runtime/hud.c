@@ -362,6 +362,18 @@ void rth_spell_list(const ng_ability *tab, uint8_t tab_n,
 static uint8_t last_moves = 0xFF;
 static uint8_t last_moves_pal = 0xFF;
 
+/* Re-place the moves sprites from the cached value after another
+   system borrowed their OAM slots (ghost hint bracket B, the hint
+   wiggle). No-op when the counter is hidden. */
+void rth_moves_restore(void) BANKED
+{
+    uint8_t m = last_moves;
+    if (m == 0xFF) return;
+    last_moves = 0xFE;        /* bust the cache */
+    last_moves_pal = 0xFF;
+    rth_show_moves(m);
+}
+
 void rth_show_moves(uint8_t moves) BANKED
 {
     uint8_t pal_state, spr_pal;

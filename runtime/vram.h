@@ -14,6 +14,8 @@
 #endif
 
 /* Load game tile graphics + palettes (res/ assets, bank 2). */
+extern uint8_t rt_screen_off_x;   /* board sprite origin (3 or 11) */
+
 void rtv_load_game_gfx(void);
 
 /* Title gfx (game tiles + UI + logo). HOME-resident bank trampoline. */

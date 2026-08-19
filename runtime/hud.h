@@ -45,6 +45,7 @@ void rth_hide_opponent(void) BANKED;
 /* Available-moves counter (legacy endless HUD: MV + 2 digits on
  * sprites 36-39, yellow < 5, red < 2). 0xFF hides it. */
 void rth_show_moves(uint8_t moves) BANKED;
+void rth_moves_restore(void) BANKED;
 
 /* Spell list sidebar (window rows 6-17): owned abilities with
  * selection brackets, affordability palettes, active-cost rows. */

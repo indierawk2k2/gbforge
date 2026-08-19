@@ -15,6 +15,7 @@
 #include "anim.h"
 #include "sound_glue.h"
 #include "cursor.h"
+#include "hud.h"
 #ifdef DEBUG_BUILD
 #include "debug.h"
 #endif
@@ -92,7 +93,7 @@ static void spawn_float(uint8_t gx, uint8_t gy, uint8_t value)
     for (i = 0; i < MAX_FLOATING_NUMS; i++) {
         if (floats[i].active) continue;
         floats[i].active = 1;
-        floats[i].sx = (uint8_t)((gx << 4) + RT_SCREEN_OFF_X + 4 + 8);
+        floats[i].sx = (uint8_t)((gx << 4) + rt_screen_off_x + 4 + 8);
         floats[i].sy = (uint8_t)((gy << 4) + RT_SCREEN_OFF_Y + 4 + 16);
         floats[i].frame = 0;
         float_count++;
@@ -259,7 +260,7 @@ void rta_play(const rt_engine *e) BANKED
                     set_sprite_tile(BURST_SPRITE_BASE + i,
                                     BURST_TILE_DOT + f);
                     move_sprite(BURST_SPRITE_BASE + i,
-                                (spark_x[i] << 4) + RT_SCREEN_OFF_X + 4 + 8,
+                                (spark_x[i] << 4) + rt_screen_off_x + 4 + 8,
                                 (spark_y[i] << 4) + RT_SCREEN_OFF_Y + 4 + 16);
                 }
                 wait_frames(RTA_PARAMS->sparkle_frames);
@@ -552,7 +553,7 @@ void rta_play_warning(const uint8_t board[8][8]) BANKED
 void rta_play_wiggle(uint8_t gx, uint8_t gy) BANKED
 {
     uint8_t tile_type = visual[gy][gx];
-    uint8_t sx = (uint8_t)((gx << 4) + RT_SCREEN_OFF_X + 8);
+    uint8_t sx = (uint8_t)((gx << 4) + rt_screen_off_x + 8);
     uint8_t sy = (uint8_t)((gy << 4) + RT_SCREEN_OFF_Y + 16);
     uint8_t frame, i;
     uint8_t total = RTA_PARAMS->wiggle_steps *
@@ -594,6 +595,11 @@ void rta_play_wiggle(uint8_t gx, uint8_t gy) BANKED
     }
     rtv_blit_tile(gx, gy, tile_type);
 
+    /* One frame so the OAM DMA actually hides the ghost sprites —
+       restoring the palettes while they are still on screen tints
+       the tile red/gray for a frame (the reported flicker). */
+    wait_frames(1);
+
     /* the wiggle borrowed OBJ palettes 4-6 for the ghost tile:
        restore them (opponent red + ghost grays) and force the
        cursor to re-assert its own palette on the next draw —
@@ -601,6 +607,7 @@ void rta_play_wiggle(uint8_t gx, uint8_t gy) BANKED
        hint brackets keep whatever gem colors the wiggle loaded */
     rtc_hint_palettes();
     rtc_invalidate();
+    rth_moves_restore();   /* the wiggle borrowed the moves slots */
 }
 
 /* ── sprite tile slide (legacy render_swap_anim mechanics) ── */
@@ -628,9 +635,9 @@ void rta_play_swap(uint8_t x1, uint8_t y1,
 {
     uint8_t type1 = visual[y1][x1];
     uint8_t type2 = visual[y2][x2];
-    uint8_t ax = RT_SCREEN_OFF_X + (x1 << 4);
+    uint8_t ax = rt_screen_off_x + (x1 << 4);
     uint8_t ay = RT_SCREEN_OFF_Y + (y1 << 4);
-    uint8_t bx = RT_SCREEN_OFF_X + (x2 << 4);
+    uint8_t bx = rt_screen_off_x + (x2 << 4);
     uint8_t by = RT_SCREEN_OFF_Y + (y2 << 4);
     int8_t dx = (x2 > x1) ? 1 : (x2 < x1) ? -1 : 0;
     int8_t dy = (y2 > y1) ? 1 : (y2 < y1) ? -1 : 0;
@@ -670,4 +677,12 @@ void rta_play_swap(uint8_t x1, uint8_t y1,
     rtv_blit_tile(x1, y1, visual[y1][x1]);
     rtv_blit_tile(x2, y2, visual[y2][x2]);
     swap_sprites_off();
+
+    /* The slide borrowed OBJ palettes 4/5 for the two tiles'
+       colors — slot 4 is the battle red, slot 5 the ghost hint
+       gray, so a water swap left the next hint bracket blue. One
+       frame for the OAM hide to land, then restore. */
+    wait_frames(1);
+    rtc_hint_palettes();
+    rtc_invalidate();
 }

@@ -14,6 +14,12 @@
 
 #define BOARD_OFFSET 1  /* board origin in bkg tile coords (x and y) */
 
+/* Horizontal sprite origin of the board. 3 under the default
+   SCX=5 layout; puzzle mode centers the board (SCX=248) and shifts
+   board-anchored sprites +8 (legacy screen_off_x). BG writes are
+   unaffected — only sprites live in screen space. */
+uint8_t rt_screen_off_x = 3;   /* RT_SCREEN_OFF_X (hud.h) */
+
 void rtv_load_game_gfx(void)
 {
     uint8_t saved = _current_bank;

@@ -389,29 +389,15 @@ void rth_show_moves(uint8_t moves) BANKED
         return;
     }
 
-    if (moves < 2) pal_state = 2;
-    else if (moves < 5) pal_state = 1;
-    else pal_state = 0;
+    /* Always black: the old yellow/red urgency palettes lived in
+       OBJ slots 5/6, which the ghost-hint/swap systems reload —
+       the digits churned colors every swap. */
+    pal_state = 0;
+    spr_pal = 0;
 
     if (moves == last_moves && pal_state == last_moves_pal) return;
     last_moves = moves;
     last_moves_pal = pal_state;
-
-    if (pal_state == 2) {
-        uint16_t pal_r[4] = { 0, 0x7FFF,
-                              (uint16_t)(24 | (24 << 5) | (24 << 10)),
-                              (uint16_t)(31 | (2 << 5) | (2 << 10)) };
-        set_sprite_palette(MOVES_PAL_RED, 1, pal_r);
-        spr_pal = MOVES_PAL_RED;
-    } else if (pal_state == 1) {
-        uint16_t pal_y[4] = { 0, 0x7FFF,
-                              (uint16_t)(24 | (24 << 5) | (24 << 10)),
-                              (uint16_t)(28 | (26 << 5)) };
-        set_sprite_palette(MOVES_PAL_YELLOW, 1, pal_y);
-        spr_pal = MOVES_PAL_YELLOW;
-    } else {
-        spr_pal = 0;
-    }
 
     if (moves > 99) moves = 99;
     set_sprite_tile(HINT_SPRITE_BASE, MOVES_SPR_TILE_M);

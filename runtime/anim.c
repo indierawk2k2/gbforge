@@ -671,6 +671,11 @@ void rta_play_swap(uint8_t x1, uint8_t y1,
                     ax + dx * off, ay + dy * off);
         place_quads(SWAP_SPRITE_B_BASE,
                     bx - dx * off, by - dy * off);
+        /* the grabber bracket rides tile A: pin it to the SAME
+           easing curve as the sprites — the frame pump's fixed-
+           speed glide ran at a different rate (reported desync) */
+        rtc_ride((int16_t)((x1 << 4) + dx * off),
+                 (int16_t)((y1 << 4) + dy * off));
         vsync();
         FRAME_HOOK();
     }

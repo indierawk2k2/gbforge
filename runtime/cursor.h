@@ -26,6 +26,11 @@
  * cursor_px/cursor_py contract for the harness */
 extern int16_t cursor_px, cursor_py;
 
+/* Pin the pixel position for THIS frame (swap slide: the bracket
+ * rides the tile on the animation's own easing curve; the next
+ * rtc_animate consumes the pin instead of gliding). */
+void rtc_ride(int16_t px, int16_t py) BANKED;
+
 /* Snap the pixel position to a grid cell (mode entry / warps). */
 void rtc_snap(uint8_t gx, uint8_t gy) BANKED;
 

@@ -18,10 +18,21 @@
 #define SCREEN_OFF 3   /* board pixels start at (3,3) under SCX/SCY=5 */
 
 int16_t cursor_px = 0, cursor_py = 0;
+static uint8_t ride_lock;   /* this frame's position is authored by
+                               an animation (swap slide) — skip the
+                               glide step so bracket and tile move
+                               on the SAME easing curve */
 
 static int16_t last_px = -1, last_py = -1;
 static uint8_t last_mode = 0xFF;
 static uint8_t last_tile_base = 0xFF;
+
+void rtc_ride(int16_t px, int16_t py) BANKED
+{
+    cursor_px = px;
+    cursor_py = py;
+    ride_lock = 1;
+}
 
 void rtc_snap(uint8_t gx, uint8_t gy) BANKED
 {
@@ -31,6 +42,10 @@ void rtc_snap(uint8_t gx, uint8_t gy) BANKED
 
 uint8_t rtc_animate(uint8_t gx, uint8_t gy) BANKED
 {
+    if (ride_lock) {
+        ride_lock = 0;
+        return 1;
+    }
     int16_t tx = (int16_t)gx << 4;
     int16_t ty = (int16_t)gy << 4;
     int16_t dx = tx - cursor_px;

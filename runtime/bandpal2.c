@@ -60,7 +60,14 @@ void bandpal_stop(void) BANKED
 {
     bp_active = 0;
     CRITICAL { IE_REG &= (uint8_t)~LCD_IFLAG; }
-    /* leave CRAM as-is: callers repaint or restore palettes next */
+    if (bp_has_restore) {
+        /* stopping mid-frame leaves CRAM frozen at whatever band
+           the beam was in — the whole screen renders wrong colors
+           until the next start. Put the caller's palettes back. */
+        vsync();
+        set_bkg_palette(0, 7, (const uint16_t *)bp_restore);
+        bp_has_restore = 0;
+    }
 }
 
 /* blit one 8-tile-row slice of a streamed image; sized so a call

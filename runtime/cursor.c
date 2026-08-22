@@ -176,6 +176,11 @@ void rtc_hint_palettes(void) BANKED
     set_sprite_palette(PAL_CURSOR_OPPONENT, 1, pal_opp);
     set_sprite_palette(PAL_GHOST_HINT, 1, pal_hint);
     set_sprite_palette(PAL_GHOST_UNSOLVABLE, 1, pal_unsolv);
+    /* slot 4 keeps its historical at-rest red: the wiggle and the
+       swap slide borrow it for tile colors, and this is the single
+       restore point (the CPU cursor itself reads slot 6 now, which
+       swaps never borrow) */
+    set_sprite_palette(4, 1, pal_opp);
     /* OBJ 7: opponent score — red glyphs, standard gray shadow */
     set_sprite_palette(7, 1, pal_score);
 }

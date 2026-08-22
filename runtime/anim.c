@@ -555,6 +555,9 @@ void rta_play_warning(const uint8_t board[8][8]) BANKED
 
 /* ── hint wiggle (legacy render_hint_wiggle mechanics) ── */
 
+/* the ghost tile rides the SWAP sprite slots (25-28): they are
+   idle while a hint plays, whereas the hint slots 36-39 carry the
+   MOVES counter in endless — the wiggle used to make it vanish */
 void rta_play_wiggle(uint8_t gx, uint8_t gy) BANKED
 {
     uint8_t tile_type = visual[gy][gx];
@@ -576,8 +579,8 @@ void rta_play_wiggle(uint8_t gx, uint8_t gy) BANKED
             set_sprite_palette(pal_slot, 1,
                 &bg_palettes[tile_palette_map[tile_type][i] * 4]);
         }
-        set_sprite_tile(HINT_SPRITE_BASE + i, HINT_TILE_BASE + i);
-        set_sprite_prop(HINT_SPRITE_BASE + i, pal_slot);
+        set_sprite_tile(SWAP_SPRITE_A_BASE + i, HINT_TILE_BASE + i);
+        set_sprite_prop(SWAP_SPRITE_A_BASE + i, pal_slot);
     }
 
     rtv_blit_tile(gx, gy, RT_EMPTY);
@@ -588,15 +591,15 @@ void rta_play_wiggle(uint8_t gx, uint8_t gy) BANKED
         if (idx >= RTA_PARAMS->wiggle_steps)
             idx = RTA_PARAMS->wiggle_steps - 1;
         o = RTA_PARAMS->wiggle_offsets[idx];
-        move_sprite(HINT_SPRITE_BASE + 0, sx + o, sy + o);
-        move_sprite(HINT_SPRITE_BASE + 1, sx + 8 + o, sy + o);
-        move_sprite(HINT_SPRITE_BASE + 2, sx + o, sy + 8 + o);
-        move_sprite(HINT_SPRITE_BASE + 3, sx + 8 + o, sy + 8 + o);
+        move_sprite(SWAP_SPRITE_A_BASE + 0, sx + o, sy + o);
+        move_sprite(SWAP_SPRITE_A_BASE + 1, sx + 8 + o, sy + o);
+        move_sprite(SWAP_SPRITE_A_BASE + 2, sx + o, sy + 8 + o);
+        move_sprite(SWAP_SPRITE_A_BASE + 3, sx + 8 + o, sy + 8 + o);
         wait_frames(1);
     }
 
     for (i = 0; i < 4; i++) {
-        move_sprite(HINT_SPRITE_BASE + i, 0, 0);
+        move_sprite(SWAP_SPRITE_A_BASE + i, 0, 0);
     }
     rtv_blit_tile(gx, gy, tile_type);
 
@@ -612,7 +615,6 @@ void rta_play_wiggle(uint8_t gx, uint8_t gy) BANKED
        hint brackets keep whatever gem colors the wiggle loaded */
     rtc_hint_palettes();
     rtc_invalidate();
-    rth_moves_restore();   /* the wiggle borrowed the moves slots */
 }
 
 /* ── sprite tile slide (legacy render_swap_anim mechanics) ── */

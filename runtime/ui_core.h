@@ -28,8 +28,13 @@ typedef struct {
 } ng_box_style;
 
 typedef struct {
-    uint8_t dy;          /* row within the box            */
-    const char *text;    /* centered in the box interior  */
+    uint8_t dy;          /* row within the box                     */
+    uint8_t dx;          /* first interior column of the span      */
+    const uint8_t *tiles;/* baked 2bpp span: text composed, pixel-
+                            centered horizontally AND vertically at
+                            BUILD time (lines straddle tile rows;
+                            empty rows/columns are trimmed)        */
+    uint8_t n_tiles;     /* span width in tiles                    */
 } ng_overlay_line;
 
 typedef struct {
@@ -41,7 +46,7 @@ typedef struct {
 /* Draw the box chrome + fill. */
 void ui_box(const ng_box_style *s) BANKED;
 
-/* Draw the full overlay: box + centered tile-font text lines. */
+/* Draw the full overlay: box + VWF text lines (merlin font). */
 void ui_show_overlay(const ng_overlay *o) BANKED;
 
 #endif

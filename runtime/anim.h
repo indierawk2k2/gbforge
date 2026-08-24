@@ -73,6 +73,10 @@ void rta_play(const rt_engine *e) BANKED;
  * swapped (the legacy reverse animation). */
 /* Install the game's per-frame pump (input + cursor redraw during
    blocking animations — legacy render_delay_with_cursor). */
+uint8_t rta_p_swap_frames(void) BANKED;
+uint8_t rta_p_swap_off(uint8_t f) BANKED;
+uint8_t rta_p_flash_hold(void) BANKED;
+uint8_t rta_p_sparkle_frames(void) BANKED;
 void rta_set_frame_hook(void (*fn)(void)) BANKED;
 
 void rta_play_swap(uint8_t x1, uint8_t y1,

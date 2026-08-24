@@ -4,15 +4,15 @@
    (see engine.h) so they live outside HOME, which the ng ROM
    nearly filled. Host builds ignore this. */
 #ifdef __SDCC
-#pragma bank 1
+#pragma bank 4   /* overlay drawing is cold; bank 1 is the engine's */
 #endif
 
 #include <gb/gb.h>
 #include <gb/cgb.h>
 
 #include "ui_core.h"
-#include "tiles_data.h"
 
+#include "merlin_font.h"     /* VWF_POOL_BASE — res contract    */
 
 void ui_box(const ng_box_style *s) BANKED
 {
@@ -46,28 +46,21 @@ void ui_box(const ng_box_style *s) BANKED
 
 void ui_show_overlay(const ng_overlay *o) BANKED
 {
-    uint8_t i;
+    uint8_t i, c;
+    uint8_t base = VWF_POOL_BASE;
+    uint8_t buf[20];
 
     ui_box(&o->box);
+    /* Lines are baked at build time: pixel-perfect centering, no
+       runtime VWF. The tile data lives in this bank (generated
+       ui_overlays.c carries the same #pragma bank). */
     for (i = 0; i < o->line_count; i++) {
         const ng_overlay_line *ln = &o->lines[i];
-        const char *s = ln->text;
-        uint8_t len = 0;
-        uint8_t buf[18];
-        uint8_t x;
-
-        while (s[len] && len < (uint8_t)(o->box.w - 2)) {
-            char c = s[len];
-            if (c >= 'A' && c <= 'Z')
-                buf[len] = UI_TILE_LETTER_A + (c - 'A');
-            else if (c >= '0' && c <= '9')
-                buf[len] = UI_TILE_DIGIT_0 + (c - '0');
-            else
-                buf[len] = UI_TILE_BLANK;
-            len++;
-        }
-        x = o->box.x + 1 + (uint8_t)((o->box.w - 2 - len) >> 1);
-        VBK_REG = VBK_TILES;
-        set_bkg_tiles(x, o->box.y + ln->dy, len, 1, buf);
+        set_bkg_data(base, ln->n_tiles, ln->tiles);
+        for (c = 0; c < ln->n_tiles && c < 20; c++) buf[c] = base + c;
+        set_bkg_tiles((uint8_t)(o->box.x + 1 + ln->dx),
+                      (uint8_t)(o->box.y + ln->dy),
+                      ln->n_tiles, 1, buf);
+        base += ln->n_tiles;
     }
 }

@@ -140,6 +140,13 @@ void rta_update_floats(void) BANKED
    and the blanking-window writes. NULL = no pump. */
 static void (*frame_hook)(void);
 
+/* parameter accessors for out-of-bank consumers (the tutorial
+   animates with the SAME curves/holds as gameplay) */
+uint8_t rta_p_swap_frames(void) BANKED { return RTA_PARAMS->swap_frames; }
+uint8_t rta_p_swap_off(uint8_t f) BANKED { return RTA_PARAMS->swap_curve[f]; }
+uint8_t rta_p_flash_hold(void) BANKED { return RTA_PARAMS->flash_hold; }
+uint8_t rta_p_sparkle_frames(void) BANKED { return RTA_PARAMS->sparkle_frames; }
+
 void rta_set_frame_hook(void (*fn)(void)) BANKED
 {
     frame_hook = fn;

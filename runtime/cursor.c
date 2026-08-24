@@ -167,8 +167,6 @@ void rtc_hint_palettes(void) BANKED
                              RGB(10, 10, 10), RGB(0, 0, 0) };
     uint16_t pal_unsolv[4] = { RGB(0, 0, 0), RGB(31, 6, 6),
                                RGB(22, 4, 4), RGB(0, 0, 0) };
-    uint16_t pal_score[4] = { RGB(0, 0, 0), RGB(20, 20, 20),
-                              RGB(28, 5, 5), RGB(0, 0, 0) };
     /* slots 4-6 are exactly the palettes the hint wiggle borrows
        for its ghost tile; reloading all three here makes this the
        one restore point (PAL_CURSOR_OPPONENT doubles as the battle
@@ -181,8 +179,6 @@ void rtc_hint_palettes(void) BANKED
        restore point (the CPU cursor itself reads slot 6 now, which
        swaps never borrow) */
     set_sprite_palette(4, 1, pal_opp);
-    /* OBJ 7: opponent score — red glyphs, standard gray shadow */
-    set_sprite_palette(7, 1, pal_score);
 }
 
 static void ghost_bracket(uint8_t base, uint8_t gx, uint8_t gy,

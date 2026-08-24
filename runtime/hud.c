@@ -219,9 +219,11 @@ void rth_show_timer(uint16_t frames_left) BANKED
 
 #define OPP_SCREEN_X 117
 #define OPP_SCREEN_Y 135
-#define OPP_PAL 7   /* red digits, GRAY shadow (slot 4 is the
-                       CPU cursor red — its bright-red shadow color
-                       bled into the score) */
+#define OPP_PAL 0   /* same palette as the player's counter:
+                       black digits, gray shadow. Slot 4 tinted the
+                       shadow red (CPU cursor palette) and slot 7 is
+                       CURSOR_PAL_TARGETING — the A-select rewrite
+                       turned the shadow white (reported vanish). */
 
 void rth_show_opponent(uint16_t kp) BANKED
 {

@@ -10,6 +10,12 @@ into the C configuration tables a shared, hand-tuned runtime
 consumes, and the result links into a ROM that runs on an 8-bit CPU
 with 8KB of work RAM and bank-switched ROM.
 
+It ships with the rest of the workbench: a headless emulator harness
+that drives the ROM at the memory and pixel level, a pure-Python model
+of the game engine that is checked against the C one over ten thousand
+boards, and the macOS art tool that owns the game's tile and palette
+source files directly.
+
 ## Why this exists
 
 The Game Boy Color has no floating point, measures its budgets in
@@ -27,26 +33,26 @@ expressiveness.
 The division of labor is deliberate, so here it is precisely: the
 **spec** declares presentation, animation, and mode policy; board
 geometry and the match/gravity/cascade resolution loop live in the
-**shared runtime**; and a thin **per-game C entry point** (282 lines
+**shared runtime**; and a thin **per-game C entry point** (286 lines
 in the example) wires input edges, score and move counters, and the
-win/lose ladder to both. The second game costs 44 lines of spec plus
-a ~280-line loop instead of a 2,519-line engine — and every timing
-and layout decision stays declarative and hot-tunable.
+win/lose ladder to both. The second game costs 44 lines of spec plus a
+~290-line loop instead of a 3,000-line engine — and every timing and
+layout decision stays declarative and hot-tunable.
 
 The reason to do this now is economic. With coding agents doing
 implementation under specification and review, one person can carry a
 model layer, a code generator, a runtime, a scriptable emulator test
-harness, and a shipping game simultaneously — a scope that previously
-wasn't worth attempting solo. Cheap implementation moves the correct
-abstraction boundary up; this repository is what that looks like in
-practice.
+harness, a set of art tools, and a shipping game simultaneously — a
+scope that previously wasn't worth attempting solo. Cheap
+implementation moves the correct abstraction boundary up; this
+repository is what that looks like in practice.
 
 ## The example
 
 `examples/cascadia/` is a complete match-3: swap-to-match, gravity,
 refills, cascade chains, 10 points a tile, win at 1000, lose after 30
 moves. Its declarative surface is [44 lines of Python](examples/cascadia/cascadia.py)
-(the score/move rules themselves live in the 282-line per-game loop —
+(the score/move rules themselves live in the 286-line per-game loop —
 see the table below for exactly who writes what):
 
 ```python
@@ -85,10 +91,12 @@ What it builds from, measured:
 | Piece | Size | Written by |
 |---|---|---|
 | `cascadia.py` — the spec | 44 lines | you |
-| `main_cascadia.c` — input edges, score/move counters, win ladder | 282 lines | you (once per game; `gen_main` is the roadmap) |
-| `generated/` — config tables from the spec | 130 lines, 8 files | gbforge |
-| `res/` — placeholder art pack (tiles, font, palettes, sprites) | 668 lines | `scripts/gen_placeholder_res.py` |
-| `runtime/` — the shared engine | 2,519 lines, 13 files | written once, shared by every game |
+| `main_cascadia.c` — input edges, score/move counters, win ladder | 286 lines | you (once per game) |
+| `generated/` — config tables and baked text from the spec | 295 lines, 9 C files | gbforge |
+| `res/` — tile art, palettes, font | 1,467 lines, 13 files | the sprite editor + `gen_placeholder_res.py` |
+| `runtime/` — the shared engine | 3,013 lines across 15 `.c` files (29 with headers) | written once, shared by every game |
+| `harness/` — the emulator test loop | 2,808 lines | shared |
+| `tools/sprite-editor/` — the art tool | 6,270 lines of Swift | shared |
 
 The generated output and the built ROM are **committed on purpose**,
 so you can read the before and after without installing a toolchain:
@@ -96,9 +104,9 @@ the spec above → [generated tables](examples/cascadia/generated/) →
 this, running in an emulator:
 
 <img src="examples/cascadia/screenshot@3x.png" width="480"
-     alt="Cascadia gameplay: an 8x8 board of ruby, emerald, topaz,
-and onyx gems with per-gem clear counters, score 120, 27 moves
-left, cursor mid-board">
+     alt="Cascadia mid-game: an 8x8 board of ruby, emerald, topaz and
+onyx gems, a sidebar of four per-gem clear counters reading 21, 22, 20
+and 08, score 710, 20 moves left, cursor at the top-left tile">
 
 *(3× scale of [the raw 160×144 capture](examples/cascadia/screenshot.png);
 the art is generated placeholder by design.)*
@@ -106,63 +114,262 @@ the art is generated placeholder by design.)*
 ## How it works
 
 ```
-spec (Python)  →  model objects  →  codegen  →  C tables  ─┐
-                                                            ├─→  GBDK/SDCC  →  ROM
-      hand-written runtime (engine, animator, UI, VRAM)  ──┘
+   spec (Python) → model objects → codegen → C tables ──┐
+                                                        │
+   hand-written runtime (engine, animator, UI, VRAM) ───┼──→ GBDK/SDCC → ROM
+                                                        │
+   res/ (the art tools own these files) ────────────────┘
 ```
 
 | Stage | What happens |
 |---|---|
 | **Model** | Plain dataclasses: modes, overlays with box geometry, animation curves, ability opcodes, audio event maps. Validated at build time. |
 | **Codegen** | Each generator emits one concern as `const` C tables — no control flow is generated, only data the runtime indexes. |
-| **Runtime** | A resolution-script engine: the board logic emits an event list (matches, falls, refills, transmutes) and a separate interpreter plays it against the data-driven timings. Rendering batches VRAM writes into the blanking windows; a staged row-blast path handles the frames where a naive write would tear. |
-| **Reference sim** | The same engine semantics exist in pure Python (`gbforge/engine/sim.py`), kept honest by a 10,000-board transcript hash against the C implementation. |
+| **Runtime** | A resolution-script engine: the board logic emits an event list (matches, falls, refills, transmutes) and a separate interpreter plays it against the data-driven timings. |
+| **Reference sim** | The same engine semantics exist in pure Python (`gbforge/engine/sim.py`), locked to the C implementation by a 10,000-board transcript hash (`make -C tests`). |
 
 Two design rules carry most of the weight:
 
 - **Generated code is data, not logic.** The runtime's hot paths are
   hand-written against the hardware; the model can grow richer without
   the ROM getting slower.
-- **Behavior is verified by execution.** The private project this was
-  extracted from drives every change through a scriptable emulator
-  harness — board states injected over a debug mailbox, frames
-  compared, RNG streams checked byte-for-byte. The example ROM in this
-  repository passed the same style of scripted checklist (swap-revert,
-  scoring, cascades, win/lose) before it was committed.
+- **Behavior is verified by execution.** Not by reading the diff.
 
-## Development setup
+## Techniques
 
-[AGENTS.md](AGENTS.md) is the onboarding document — environment
-setup, how to rebuild the scripted verification loop against any
-emulator with memory access (symbol table + debug mailbox), and
-the rules that keep the tree healthy. It's written for coding
-agents and works just as well for people.
+The interesting engineering is where the model meets the hardware.
 
-## Building the example
+**Per-band palette streaming** (`runtime/bandpal.c`). The GBC gives a
+background 8 palettes of 4 colors. A full-screen image wants more. So
+an image is cut into 8-pixel bands whose palettes alternate between
+slot halves — even bands render from BG palettes 0–2, odd bands from
+3–5 — and while band *b−1* is on screen, its half is idle and band
+*b*'s palettes are streamed into it. VBlank loads the first two bands;
+an LYC interrupt walks down the frame loading the rest. CRAM is locked
+during PPU mode 3, so each write edge-syncs on mode-3 exit and the
+eight bytes are preloaded into locals beforehand — only the tight
+stores sit inside the ~167-dot window, because spilling past it drops
+bytes silently rather than failing. The whole file is `NONBANKED`: the
+ISR fires with arbitrary banks mapped.
+
+**Sub-tile text layout.** The background is a grid of 8×8 tiles, so
+text on it normally snaps to that grid, and centering is only ever
+right to the nearest 8 pixels. gbforge composes each overlay line
+against the VWF font *at build time* — glyphs straddle tile
+boundaries freely, the run is centered at pixel granularity inside the
+box interior, a drop shadow is baked in, and the result is emitted as
+ready-to-upload 2bpp tile data with the blank rows and columns
+trimmed. At run time `ui_show_overlay` just uploads spans into a tile
+pool and points the map at them; there is no glyph rasterizer in the
+ROM. The build fails if a spec's text needs more pool tiles than the
+res contract provides, and fails again if the box would sit outside
+the rectangle the board restore repaints. Title menu labels go through
+the same pipeline, with each item's arrow position computed from where
+its ink actually starts rather than from the label's box.
+
+The same idea covers counters that need to sit *off* the tile grid:
+the res pack carries pre-shifted copies of the digit set, baked
+already scrolled down N pixels and split across the tile-row boundary,
+so a HUD row can land at a sub-tile offset that the background layer
+has no scroll register to express. `runtime/hud.c` picks a row's digit
+set from a descriptor table; Cascadia's four counters are tile-aligned
+and share one.
+
+**Resolution scripts.** The engine never animates. `rt_process` resolves
+a full pass into an event list — match rows, awards, transmutes, falls,
+refills — and `runtime/anim.c` plays that list at whatever timing the
+spec declared. Logic never waits on rendering and rendering never
+mutates logic state, which is what makes the engine a pure function
+that can run 10,000 boards on a laptop in under a second, and what
+makes animation timing a number in a Python file.
+
+**Staged row blasting** (`runtime/vram.c`). Mid-animation board updates
+are precomputed CPU-side — 32 attribute bytes and 32 tile bytes per
+logical row — then written raw during VBlank, or STAT-guarded if the
+raster has already passed. Doing the arithmetic outside the blanking
+window is what makes the write fit inside it.
+
+**Derived art.** Ghost tiles — the faded copies drawn for a tile in
+transit during a refill — are generated from the artist's real tile
+data on every build (`scripts/derive_ghost_tiles.py`). Nobody draws
+the same gem twice, and the two can't drift.
+
+**No division, and no trusting the compiler.** Per-frame paths index
+lookup tables instead of dividing (`digit_tens[]`/`digit_ones[]`).
+`hud.c` tests ability ownership against a mask table rather than
+`1 << id`, because SDCC 4.5 miscompiled the variable-shift form — the
+kind of thing you only find by running the ROM.
+
+## Built by agents, working in parallel
+
+This codebase is a monorepo whose parts all reach the same main loop.
+That normally serializes work: two people, or two agents, editing a
+match-3 engine collide constantly. The abstraction is what makes
+concurrency possible, because it turns one codebase into surfaces that
+change independently:
+
+| Surface | Changes when | Collides with |
+|---|---|---|
+| `cascadia.py` + `gbforge/model` | rules, timings, layout | nothing — it's data |
+| `gbforge/codegen` | how a concern becomes tables | its own generated file |
+| `runtime/*.c` | hardware behaviour, performance | other runtime edits |
+| `res/*` | art | nothing — the tools own these files |
+| `harness/scenarios` | what "correct" means | nothing |
+
+Concretely, in this repository:
+
+- **`generated/` is data, never control flow.** Two agents changing
+  two generators touch two files that contain no logic to conflict
+  over.
+- **`res/` is owned by the tools, not the build.** `make res` seeds
+  the editor-owned files once and then refuses to overwrite them. An
+  artist's export and a code change are not the same kind of event and
+  do not race.
+- **ROM banks are the one genuinely global resource**, and the linker
+  reports an overflow by silently placing code at an address that is
+  not code. `scripts/check_banks.py` runs on every link and turns that
+  into a build error — which is what makes it safe for several agents
+  to add code without coordinating.
+- **The transcript oracle is the semantic contract.** Any change to
+  the engine, from any branch, must still fold 10,000 boards to the
+  same hash as the Python model. Agreement between two independent
+  implementations is a much stronger merge gate than a passing diff.
+- **`scripts/verify.sh` is worktree-aware.** Parallel agents means
+  parallel `git worktree` checkouts; the script links the heavy
+  gitignored dependencies (SameBoy's source and built library) from
+  the main checkout instead of re-fetching them per worktree.
+- **[AGENTS.md](AGENTS.md) is the contract they work under** —
+  environment, the rules that keep the tree healthy, and the
+  instruction to re-measure any number that reaches this README.
+
+The honest evidence that this matters: when this repository was
+extracted from the private project, `runtime/ui_core.c` and `title.c`
+were updated to the baked-text pipeline while their generators were
+not, `hud.h` was generalized while `hud.c` was not, and a header the
+runtime `#include`s was never committed. A clean clone did not build.
+Nothing noticed, because at that point there was nothing here to
+notice. That is the argument for the next two sections.
+
+## The verification loop
+
+`harness/gbctl` links SameBoy's emulator core into a headless binary
+that speaks one line protocol ([PROTOCOL.md](harness/PROTOCOL.md)) over
+stdin/stdout. Emulation is **parked** — it advances only when a command
+says so — so a scripted run produces the same frames on every machine,
+with no window and no wall clock.
+
+```bash
+make -C harness gbctl     # fetch + build SameBoy, build gbctl (~1 min once)
+make -C harness test      # 14 scenarios, ~1.2s
+```
+
+What a scenario can do:
+
+- **Jump to any point in the game.** The dev ROM carries a four-byte
+  WRAM mailbox (`runtime/debug.h`): enter a mode straight from the
+  title, force the RNG seed so a board layout is a property of the
+  build rather than of `DIV_REG` at the instant someone pressed START,
+  teleport the cursor and perform a swap as if it were input, or
+  redraw after the harness has rewritten `board[][]` wholesale. No
+  button choreography to break when a menu gains a row.
+- **Read and write any state by name.** Addresses come from the
+  linker's `.noi`, parsed per-ROM — never hand-typed. Binding to the
+  *loaded* ROM matters: the dev build's mailbox shifts every variable
+  declared after it, so resolving against the wrong symbol table reads
+  plausible-looking garbage from whatever moved into the old address.
+- **Assert on pixels.** `screenshot_raw` returns the framebuffer
+  inline; `pygb.screen` compares against `golden/`, hashes regions,
+  and records per-frame hash *sequences* — so a one-frame tear that
+  repairs itself is still visible, which a before/after comparison
+  cannot see.
+- **Start from a checkpoint.** `harness/checkpoints/recipes/*.py` are
+  recipes, not committed savestates, and the cache is keyed by the
+  ROM's SHA1 — a rebuilt ROM cannot silently load a stale state.
+
+Memory and pixel assertions catch opposite bugs, and the suite is
+built so that both halves are exercised. Deliberately breaking the
+revert path so it repaints correctly but leaves the model wrong fails
+`test_non_matching_swap_reverts` while every pixel test passes;
+breaking it the other way does the reverse.
+
+Both mutations were run against the suite before it was committed. A
+green test that has never been seen to fail is not evidence.
+
+Above the emulator, `make -C tests` compiles `runtime/engine.c`
+host-native — it is a pure function, so it can be — and folds 10,000
+boards' worth of intermediate states into a 64-bit transcript that must
+equal the pure-Python model's. Two independent implementations
+agreeing on three million observations is a statement about the semantics, not
+about a fixture.
+
+## The art tools
+
+`tools/sprite-editor/` is a SwiftUI macOS app for drawing the game's
+16×16 tiles and editing its palettes. Its document *is*
+`examples/cascadia/res/tiles_data.c` and `res/palettes.c`: it parses
+them on open and rewrites them on save, and the build compiles exactly
+what was saved. There is no export step to forget and no second copy
+to drift.
+
+```bash
+cd tools/sprite-editor && ./build-app.sh && open GBSpriteEditor.app
+```
+
+The cost of that directness is a format contract, enforced from both
+sides:
+
+- `scripts/editor-roundtrip.sh` compiles the editor's UI-free model
+  layer with `swiftc` and runs import → export → import → export
+  headlessly; the two exports must be byte-identical. It runs in CI
+  with no window server.
+- `tests/test_asset_contracts.py` checks the same boundary from the
+  runtime's side: the arrays it links against are still exported,
+  still *unsized* (the importer greps for `name[]`, so a sized
+  declaration is a different symbol to it even though the C compiler
+  cannot tell), palettes still use the `RGB()` macro with `// Name (N)`
+  slot comments, and — the rule that was learned the hard way — **no
+  symbol the editor doesn't round-trip may live in a file the editor
+  rewrites.**
+
+That last one is not hypothetical. `sprite_palettes` originally lived
+in `palettes.c`; the first real export over `res/` produced a ROM that
+would not link, because the editor faithfully rewrote the file with
+only the symbol it knew about. The fix was moving the symbol; the
+durable fix was the test.
+
+The private project runs this same pattern for three more editors —
+portraits, sound effects, and a pixel/tile editor — each owning its
+slice of `res/` behind its own round-trip gate.
+
+## Building
 
 Requires [GBDK-2020](https://github.com/gbdk-2020/gbdk-2020) 4.5.0+
-and Python 3.9+. No Python dependencies.
+and Python 3.9+. No Python dependencies. The harness additionally needs
+a C compiler and `git` (it fetches and builds SameBoy once); the art
+tool needs Xcode's Swift toolchain.
 
 ```bash
 cd examples/cascadia
 make gen                      # cascadia.py -> generated/  (committed)
-make res                      # regenerate the placeholder art pack
+make res                      # seed/refresh the asset pack
 GBDK_HOME=/path/to/gbdk/ make # -> cascadia.gbc
 ```
 
-Output: `examples/cascadia/cascadia.gbc`, runnable in any Game Boy
-Color emulator. `make debug` builds a dev ROM with a scriptable
-mailbox (`runtime/debug.h`) that a test harness can drive.
+Everything at once, in the order that fails fastest:
+
+```bash
+GBDK_HOME=/path/to/gbdk/ ./scripts/verify.sh
+```
 
 ## Scope
 
 gbforge is extracted from a larger private project — a complete
 commercial-shape GBC game whose entire mode set (endless, puzzle,
-timed, battle with a CPU opponent, a quest campaign with dialogue,
-a store, battery saves) runs on this runtime, byte-for-byte
-equivalent to the hand-written implementation it replaced. That game
-and its assets are not part of this repository; the example art is
-generated placeholder by design.
+timed, battle with a CPU opponent, a quest campaign with dialogue, a
+store, battery saves) runs on this runtime, byte-for-byte equivalent to
+the hand-written implementation it replaced. That game and its assets
+are not part of this repository; the example art is generated
+placeholder by design.
 
 This is working code, not a product. The model grows when the games
 need it to, and there is no stability guarantee.

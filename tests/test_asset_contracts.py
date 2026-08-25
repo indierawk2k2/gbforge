@@ -131,3 +131,54 @@ def test_editor_round_trip_is_byte_stable():
     r = subprocess.run([script, RES], capture_output=True, text=True)
     assert r.returncode == 0, r.stdout + r.stderr
     assert "ok" in r.stdout
+
+
+def _ui_tile(index):
+    """One 8x8 tile out of ui_tile_data[], as 8 rows of ink bitmasks."""
+    src = _res("ui_tiles.c")
+    m = re.search(r"const\s+uint8_t\s+ui_tile_data\s*\[\s*\]\s*=\s*{(.*?)}\s*;",
+                  src, re.S)
+    body = re.sub(r"//[^\n]*|/\*.*?\*/", "", m.group(1), flags=re.S)
+    data = [int(t, 0) for t in re.findall(r"0[xX][0-9a-fA-F]+|\b\d+\b", body)]
+    tile = data[index * 16:(index + 1) * 16]
+    return [tile[r * 2] | tile[r * 2 + 1] for r in range(8)]
+
+
+def _base(name):
+    h = _res("tiles_data.h")
+    m = re.search(rf"#define\s+{name}\s+\(UI_TILE_BASE \+ (\d+)\)", h)
+    assert m, f"{name} is not defined"
+    return int(m.group(1))
+
+
+@pytest.mark.parametrize("ov,lo,dy", [
+    ("UI_TILE_DIGIT_OV1_0", "UI_TILE_DIGIT_S1_0", 3),
+    ("UI_TILE_DIGIT_OV2_0", "UI_TILE_DIGIT_S2_0", 6),
+])
+def test_subtile_digit_sets_are_actually_shifted(ov, lo, dy):
+    """The OVn/Sn digit sets must be a real pre-shifted pair, not
+    aliases of the base set.
+
+    A HUD row that sits dy pixels below its tile boundary draws OVn on
+    the row above and Sn on its own. If the two sets are copies of the
+    base glyphs, the text renders tile-aligned and the sub-tile offset
+    silently does nothing — it looks almost right, which is worse than
+    looking broken.
+    """
+    plain = _ui_tile(_base("UI_TILE_DIGIT_0") + 3)      # the glyph "3"
+    upper = _ui_tile(_base(ov) + 3)
+    lower = _ui_tile(_base(lo) + 3)
+
+    ink = [r for r, v in enumerate(plain) if v]
+    assert ink, "the base digit set has no ink"
+
+    # every base row appears exactly dy rows lower, split across the pair
+    for r in ink:
+        target = r + dy
+        got = upper[target] if target < 8 else lower[target - 8]
+        assert got == plain[r], (
+            f"{ov}/{lo}: base row {r} should appear at offset "
+            f"{target} of the shifted pair")
+
+    assert any(lower), f"{lo} is empty — the pair never straddles the boundary"
+    assert upper != plain, f"{ov} is an unshifted copy of the base set"

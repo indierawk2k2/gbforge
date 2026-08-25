@@ -275,6 +275,28 @@ const uint8_t merlin_bitmaps[{len(bitmaps) * 8}] = {{
     return c, h
 
 
+def shifted_pair(ch, dy, color=3):
+    """A glyph rendered at a sub-tile vertical offset, as the two
+    tiles it then straddles: (upper_row_tile, lower_row_tile).
+
+    The background layer has one scroll register for the whole plane,
+    so a single HUD row cannot be nudged off the 8-pixel grid at run
+    time. Baking the offset into the tile data is how you get a
+    counter to sit at, say, y=11 — the glyph's top (8-dy) rows go to
+    the bottom of the upper tile, the remaining dy rows to the top of
+    the lower one, and the map points at both.
+    """
+    g = glyph(ch, color)
+    upper, lower = blank(), blank()
+    for y in range(8):
+        ty = y + dy
+        if ty < 8:
+            upper[ty] = list(g[y])
+        else:
+            lower[ty - 8] = list(g[y])
+    return upper, lower
+
+
 def small_glyph(ch, color=3):
     """5x5-ish reduction of a glyph for the small-digit set."""
     g = glyph(ch, color)
@@ -537,10 +559,14 @@ def main():
     ui = [blank()] * 126
     for d in range(10):
         ui[0 + d] = glyph(str(d))
-        ui[116 + d] = glyph(str(d))            # OV1 digit alias set
-        ui[72 + d] = glyph(str(d))             # S1 set
-        ui[82 + d] = glyph(str(d))             # S2 set
-        ui[92 + d] = glyph(str(d))             # OV2 set
+        # Two sub-tile digit sets, each a genuinely pre-shifted pair:
+        # OVn is the upper tile-row half, Sn the lower. A HUD row that
+        # sits `dy` pixels below its tile boundary draws OVn on the
+        # row above and Sn on its own — see hud.c's descriptor table.
+        for setno, dy in ((1, 3), (2, 6)):
+            up, lo = shifted_pair(str(d), dy)
+            ui[(116 if setno == 1 else 92) + d] = up   # OV1 / OV2
+            ui[(72 if setno == 1 else 82) + d] = lo    # S1  / S2
         ui[103 + d] = small_glyph(str(d))
     ui[10] = solid(2)
     ui[11] = blank()
@@ -571,8 +597,15 @@ def main():
     ui[63] = corner_l(0, 7, +1, -1, notch=False)
     ui[64] = corner_l(0, 0, -1, -1, notch=False)
     ui[66] = tri(True, 1); ui[67] = tri(False, 1)
-    ui[68] = rounded(2); ui[69] = rounded(2)
-    ui[70] = rounded(2); ui[71] = rounded(2)
+    # swatches for the sub-tile rows, shifted to match their digits
+    for idx, (dy, upper) in enumerate(((3, True), (3, False),
+                                       (6, True), (6, False))):
+        g = rounded(2)
+        up, lo = blank(), blank()
+        for y in range(8):
+            ty = y + dy
+            (up if ty < 8 else lo)[ty if ty < 8 else ty - 8] = list(g[y])
+        ui[68 + idx] = up if upper else lo
     ui[102] = dot()
     ui[115] = glyph(":")
 

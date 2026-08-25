@@ -303,7 +303,10 @@ void rth_spell_list(const ng_ability *tab, uint8_t tab_n,
     uint8_t t[3], at[3];
 
     for (id = 1; id <= tab_n && id <= 7; id++) {
-        if (owned & (uint8_t)(1 << id)) {
+        /* mask table, not `1 << id`: SDCC 4.5 miscompiled the
+           variable-shift form of this test in the game's store */
+        static const uint8_t hud_bit[8] = { 1, 2, 4, 8, 16, 32, 64, 128 };
+        if (owned & hud_bit[id]) {
             if (id == active_id) sel = n;
             list[n++] = id;
         }

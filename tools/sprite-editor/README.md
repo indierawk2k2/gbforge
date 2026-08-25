@@ -47,6 +47,7 @@ that would not link, because the editor faithfully rewrote
 | `ui_tiles.c`, `sprites_data.c` | `scripts/gen_placeholder_res.py` |
 | `ghost_tiles.c` | derived from `tiles_data.c` on every build by `scripts/derive_ghost_tiles.py` — redraw a gem, rebuild, and its faded refill variant follows |
 | `*.h` | `gen_placeholder_res.py` — the index constants both sides compile against |
+| `indicator_tiles.c` | the editor, for games that use indicator tiles. Cascadia does not, so nothing compiles it; it is committed because the committed `res/` is exactly what the tool produces, and a file the editor writes on every save should not show up as a spurious diff. |
 
 The private project this was extracted from runs the same pattern for
 three more editors (portraits, sound effects, a tile/pixel editor),

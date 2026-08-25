@@ -224,3 +224,38 @@ def test_display_face_is_proportional():
     assert letters["I"] < letters["W"], (
         f"I advances {letters['I']}px and W {letters['W']}px — "
         f"the face is not proportional")
+
+
+def _title_glyph_rows(gi, bitmaps):
+    """16 rows of ink bitmasks for display-face glyph `gi`."""
+    return [(bitmaps[gi * 32 + r * 2] << 8) | bitmaps[gi * 32 + r * 2 + 1]
+            for r in range(16)]
+
+
+def test_display_face_has_one_cap_height():
+    """Every letter must sit on the same baseline and reach the same
+    cap line.
+
+    A single glyph one row taller than the rest is not obviously wrong
+    in isolation — it looks like a slightly bolder letter — but in a
+    word it reads as a typo. The 16px A shipped a row taller than the
+    other 35 glyphs and had to be recut; this is the check that would
+    have caught it at build time.
+    """
+    recode = _title_table("title_recode")
+    widths = _title_table("title_widths")
+    bitmaps = _title_table("title_bitmaps")
+
+    extents = {}
+    for ch in "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789":
+        gi = recode[ord(ch)]
+        rows = _title_glyph_rows(gi, bitmaps)
+        inked = [i for i, v in enumerate(rows) if v]
+        assert inked, f"display-face glyph {ch!r} is blank"
+        extents.setdefault((min(inked), max(inked)), []).append(ch)
+
+    assert len(extents) == 1, (
+        "display face has mixed cap extents: "
+        + "; ".join(f"rows {t}..{b} -> {''.join(cs)}"
+                    for (t, b), cs in sorted(extents.items())))
+    assert len(widths) * 32 == len(bitmaps)

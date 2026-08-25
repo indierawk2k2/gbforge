@@ -77,12 +77,15 @@ class ResManifest:
 
 # What the runtime compiles against and the editors export. A name
 # leaving this set is a breaking change to both at once.
+#
+# The title logo is deliberately absent: it is baked by gen_title from
+# the spec's text in the display face, so res owns its tile RANGE
+# (title_logo.h) but not its pixels.
 REQUIRED_ARRAYS = {
     "tile_data",              # 16x16 board cells, 4 hw tiles each
     "ui_tile_data",           # digits, letters, borders, corners
     "spell_icon_tile_data",   # ability icons
     "ghost_tile_data",        # faded refill transit variants
-    "title_logo_tiles",
     "cursor_sprite_data",
 }
 

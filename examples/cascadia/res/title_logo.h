@@ -7,9 +7,10 @@
 #include <stdint.h>
 #include "tiles_data.h"
 
+/* Tile-range contract only. The logo ITSELF is baked by gbforge's
+ * gen_title from the spec's text in the 16x16 display face, and
+ * uploaded by the title screen — res owns the range, not the art. */
 #define TITLE_LOGO_TILE_BASE (SPELL_ICON_TILE_BASE + SPELL_ICON_COUNT)
-#define TITLE_LOGO_TILE_COUNT (8 * 4)
-
-extern const uint8_t title_logo_tiles[];
+#define TITLE_LOGO_TILE_MAX (VWF_POOL_BASE - TITLE_LOGO_TILE_BASE)
 
 #endif

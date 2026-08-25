@@ -52,19 +52,18 @@ uint8_t rtt_show(const ng_title *t) BANKED
         for (y = 0; y < 18; y++) set_bkg_tiles(0, y, 20, 1, blank_row);
     }
 
-    /* logo strip: N 16x16 letters, 4 tiles each */
+    /* logo: one upload of the baked two-row run, then point the map
+       at it. The generator centred the INK, so logo_x is wherever
+       that landed rather than a number anyone chose. */
     {
-        uint8_t top_row[16], bot_row[16];
-        uint8_t w = t->logo_letters << 1;
-        for (i = 0; i < t->logo_letters; i++) {
-            uint8_t base = TITLE_LOGO_TILE_BASE + (i << 2);
-            top_row[(i << 1)] = base;
-            top_row[(i << 1) + 1] = base + 1;
-            bot_row[(i << 1)] = base + 2;
-            bot_row[(i << 1) + 1] = base + 3;
-        }
-        set_bkg_tiles(t->logo_x, t->logo_y, w, 1, top_row);
-        set_bkg_tiles(t->logo_x, t->logo_y + 1, w, 1, bot_row);
+        uint8_t row[20];
+        uint8_t n = t->logo_tiles;
+        uint8_t base = TITLE_LOGO_TILE_BASE;
+        set_bkg_data(base, n << 1, t->logo);
+        for (i = 0; i < n && i < 20; i++) row[i] = base + i;
+        set_bkg_tiles(t->logo_x, t->logo_y, n, 1, row);
+        for (i = 0; i < n && i < 20; i++) row[i] = base + n + i;
+        set_bkg_tiles(t->logo_x, t->logo_y + 1, n, 1, row);
     }
 
     /* decorative palette bar (deco_n == 0 declares no bar) */
@@ -88,7 +87,7 @@ uint8_t rtt_show(const ng_title *t) BANKED
             const ng_menu_item *it = &t->menu.items[i];
             set_bkg_data(base, it->n_tiles, it->tiles);
             for (c = 0; c < it->n_tiles && c < 20; c++) buf[c] = base + c;
-            set_bkg_tiles(t->menu.run_x,
+            set_bkg_tiles(it->run_x,
                           t->menu.first_y + i * t->menu.row_step,
                           it->n_tiles, 1, buf);
             base += it->n_tiles;

@@ -33,10 +33,10 @@ expressiveness.
 The division of labor is deliberate, so here it is precisely: the
 **spec** declares presentation, animation, and mode policy; board
 geometry and the match/gravity/cascade resolution loop live in the
-**shared runtime**; and a thin **per-game C entry point** (286 lines
+**shared runtime**; and a thin **per-game C entry point** (317 lines
 in the example) wires input edges, score and move counters, and the
 win/lose ladder to both. The second game costs 44 lines of spec plus a
-~290-line loop instead of a 3,000-line engine — and every timing and
+~320-line loop instead of a 3,000-line engine — and every timing and
 layout decision stays declarative and hot-tunable.
 
 The reason to do this now is economic. With coding agents doing
@@ -75,7 +75,7 @@ GAME = Game(
     title=TitleScreen(
         menu=Menu("mode_select", pos=(4, 10), label_x=6,
                   items=[("PLAY", 0)]),
-        logo_letters=8,
+        logo_text="CASCADIA",
         deco_palettes=("fire", "earth", "gold", "silver") * 3,
     ),
 )
@@ -91,11 +91,11 @@ What it builds from, measured:
 | Piece | Size | Written by |
 |---|---|---|
 | `cascadia.py` — the spec | 44 lines | you |
-| `main_cascadia.c` — input edges, score/move counters, win ladder | 286 lines | you (once per game) |
-| `generated/` — config tables and baked text from the spec | 295 lines, 9 C files | gbforge |
-| `res/` — tile art, palettes, font | 1,467 lines, 13 files | the sprite editor + `gen_placeholder_res.py` |
+| `main_cascadia.c` — input edges, score/move counters, win ladder | 317 lines | you (once per game) |
+| `generated/` — config tables and baked text from the spec | 339 lines, 9 C files | gbforge |
+| `res/` — tile art, palettes, both font weights | 1,492 lines, 13 files | the sprite editor + `gen_placeholder_res.py` |
 | `runtime/` — the shared engine | 3,013 lines across 15 `.c` files (29 with headers) | written once, shared by every game |
-| `harness/` — the emulator test loop | 2,808 lines | shared |
+| `harness/` — the emulator test loop | 2,993 lines | shared |
 | `tools/sprite-editor/` — the art tool | 6,270 lines of Swift | shared |
 
 The generated output and the built ROM are **committed on purpose**,
@@ -166,6 +166,19 @@ res contract provides, and fails again if the box would sit outside
 the rectangle the board restore repaints. Title menu labels go through
 the same pipeline, with each item's arrow position computed from where
 its ink actually starts rather than from the label's box.
+
+The title screen runs on the same machinery with a second, 16×16
+weight of the font — hand-plotted at a 3px stem rather than scaled up,
+because doubling an 8px face gives hairline strokes on a big body and
+a monospaced grid. `gen_title` bakes the spec's `logo_text` into a
+two-row run and centres its **ink** — not its advance width, and not
+the tile run — so the logo lands on the exact middle pixel instead of
+the nearest tile. The menu is laid out as one block: arrows share a
+column, labels share a left edge, and because the arrow is a
+background tile that can only sit on an 8px boundary while the labels
+are baked and can sit anywhere, the arrow snaps and the *gap* absorbs
+the error. Letting the labels follow the snapped arrow instead is what
+puts a menu up to 4px off centre.
 
 The same idea covers counters that need to sit *off* the tile grid:
 the res pack carries pre-shifted copies of the digit set, baked
@@ -260,7 +273,7 @@ with no window and no wall clock.
 
 ```bash
 make -C harness gbctl     # fetch + build SameBoy, build gbctl (~1 min once)
-make -C harness test      # 14 scenarios, ~1.2s
+make -C harness test      # 20 scenarios, ~1.8s
 ```
 
 What a scenario can do:
@@ -286,14 +299,20 @@ What a scenario can do:
   recipes, not committed savestates, and the cache is keyed by the
   ROM's SHA1 — a rebuilt ROM cannot silently load a stale state.
 
-Memory and pixel assertions catch opposite bugs, and the suite is
-built so that both halves are exercised. Deliberately breaking the
-revert path so it repaints correctly but leaves the model wrong fails
-`test_non_matching_swap_reverts` while every pixel test passes;
-breaking it the other way does the reverse.
+Memory and screen assertions catch opposite bugs, and the suite is
+built so both halves are exercised. Break the revert path so it
+repaints correctly but leaves the model wrong and
+`test_non_matching_swap_reverts` fails while every visual test passes;
+break it the other way — model restored, screen not repainted — and
+exactly the reverse happens.
 
-Both mutations were run against the suite before it was committed. A
-green test that has never been seen to fail is not evidence.
+Every detector here was run against the broken version first. That is
+not a formality: writing this suite produced one test that passed on
+the very layout it was meant to reject (ink-start pitch does vary in a
+monospaced grid, because narrow letters sit in wider cells), and the
+property it was after had to move somewhere it could be checked
+exactly. A green test that has never been seen to fail is not
+evidence.
 
 Above the emulator, `make -C tests` compiles `runtime/engine.c`
 host-native — it is a pure function, so it can be — and folds 10,000

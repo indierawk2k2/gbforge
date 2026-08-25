@@ -65,7 +65,7 @@ def test_palettes_use_the_rgb_macro():
 # sprite_palettes precisely because palettes.c is the editor's.
 EDITOR_ROUNDTRIPPED = ("tile_data", "spell_icon_tile_data",
                        "bg_palettes", "tile_palette_map")
-GENERATOR_OWNED = ("ui_tile_data", "title_logo_tiles", "ghost_tile_data",
+GENERATOR_OWNED = ("ui_tile_data", "ghost_tile_data",
                    "sprite_palettes")
 
 
@@ -182,3 +182,45 @@ def test_subtile_digit_sets_are_actually_shifted(ov, lo, dy):
 
     assert any(lower), f"{lo} is empty — the pair never straddles the boundary"
     assert upper != plain, f"{ov} is an unshifted copy of the base set"
+
+
+def _title_table(name):
+    src = _res("merlin_font.c")
+    m = re.search(rf"{name}\[\d*\]\s*=\s*{{(.*?)}};", src, re.S)
+    assert m, f"{name} missing from the res font"
+    body = re.sub(r"//[^\n]*|/\*.*?\*/", "", m.group(1), flags=re.S)
+    return [int(t, 0) for t in
+            re.findall(r"0[xX][0-9a-fA-F]+|\b\d+\b", body)]
+
+
+def test_display_face_exists_and_is_16px():
+    """The title logo is baked in a second, 16x16 weight — 32 bytes a
+    glyph, two per row. Without it gen_title falls back to nothing and
+    the build fails, which is the intended outcome; this says so."""
+    widths = _title_table("title_widths")
+    bitmaps = _title_table("title_bitmaps")
+    assert widths, "no title_widths in the res font"
+    assert len(bitmaps) == len(widths) * 32, (
+        f"{len(bitmaps)} bitmap bytes for {len(widths)} glyphs — "
+        f"expected 32 each (16 rows x 2 bytes)")
+
+
+def test_display_face_is_proportional():
+    """Advances must differ per letter.
+
+    A monospaced display face is what made the old logo look like a
+    placeholder: every letter got the same cell, so I floated in a
+    hole and the run could only ever be centred to 8px. This is
+    checked against the advance table rather than against a
+    screenshot, because a rendered monospaced grid of narrow and wide
+    letters still produces varying ink positions — the pixel test
+    for this passes on the layout it is supposed to reject.
+    """
+    recode = _title_table("title_recode")
+    widths = _title_table("title_widths")
+    letters = {c: widths[recode[ord(c)]] for c in "IWAMLT"}
+    assert len(set(letters.values())) > 1, (
+        f"every letter advances the same: {letters}")
+    assert letters["I"] < letters["W"], (
+        f"I advances {letters['I']}px and W {letters['W']}px — "
+        f"the face is not proportional")

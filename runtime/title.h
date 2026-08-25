@@ -16,23 +16,29 @@
 #endif
 
 typedef struct {
-    const uint8_t *tiles;   /* UI-letter tile indices */
-    uint8_t n_tiles;        /* baked run width (tiles)          */
-    uint8_t value;          /* returned on confirm              */
-    uint8_t arrow_x;        /* two tiles left of the label ink
-                               (per item: labels are pixel-
-                               centered so ink start varies)     */
+    const uint8_t *tiles;   /* baked 2bpp label run              */
+    uint8_t n_tiles;        /* baked run width (tiles)           */
+    uint8_t run_x;          /* per item: the arrow is tile-aligned
+                               but the ink is placed at pixel
+                               precision, so each row's run can
+                               start in a different tile          */
+    uint8_t value;          /* returned on confirm               */
+    uint8_t arrow_x;        /* tile holding the arrow; arrow, gap
+                               and label are centred as one unit  */
 } ng_menu_item;
 
 typedef struct {
-    uint8_t run_x, first_y; /* where the baked runs sit          */
+    uint8_t first_y;
     uint8_t row_step;
     uint8_t count;
     const ng_menu_item *items;
 } ng_menu;
 
 typedef struct {
-    uint8_t logo_letters;   /* 16x16 letters, 4 tiles each */
+    /* Baked 16x16-face logo: a run of `logo_tiles` columns, two tile
+       rows tall, row-major (all of row 0, then all of row 1). */
+    const uint8_t *logo;
+    uint8_t logo_tiles;
     uint8_t logo_x, logo_y;
     uint8_t deco_x, deco_y, deco_n;
     uint8_t deco_attrs[16];

@@ -53,8 +53,8 @@ void rtv_load_title_gfx(void)
     SWITCH_ROM(2);
     set_bkg_data(0, TOTAL_GAME_HW_TILES, tile_data);
     set_bkg_data(UI_TILE_BASE, UI_TILE_COUNT, ui_tile_data);
-    set_bkg_data(TITLE_LOGO_TILE_BASE, TITLE_LOGO_TILE_COUNT,
-                 title_logo_tiles);
+    /* The logo is baked by gen_title from the spec's text, not a res
+       asset — rtt_show uploads it itself. */
     SWITCH_ROM(saved);
 }
 

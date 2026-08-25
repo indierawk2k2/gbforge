@@ -38,7 +38,7 @@ GAME = Game(
     title=TitleScreen(
         menu=Menu("mode_select", pos=(4, 10), label_x=6,
                   items=[("PLAY", 0)]),
-        logo_letters=8,                       # C A S C A D I A
+        logo_text="CASCADIA",
         deco_palettes=(),                     # no deco bar
     ),
 )

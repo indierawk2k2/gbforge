@@ -19,6 +19,11 @@
 #define UI_TILE_LABEL_K      (UI_TILE_BASE + 12)
 #define UI_TILE_LETTER_A     (UI_TILE_BASE + 14)
 #define UI_TILE_ARROW        (UI_TILE_BASE + 40)
+/* Ink bounds of the arrow glyph inside its 8px cell. gen_title
+ * centres the arrow+label block optically, which needs the ink, not
+ * the cell. */
+#define UI_TILE_ARROW_INK_X0 1
+#define UI_TILE_ARROW_INK_X1 6
 #define UI_TILE_CHECK        (UI_TILE_BASE + 41)
 #define UI_TILE_OVL_BORDER_TOP   (UI_TILE_BASE + 42)
 #define UI_TILE_OVL_BORDER_BOT   (UI_TILE_BASE + 43)

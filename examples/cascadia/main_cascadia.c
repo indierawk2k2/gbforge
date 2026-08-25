@@ -176,6 +176,24 @@ static uint8_t do_swap(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2)
     return 0;
 }
 
+/* Per-frame presentation during BLOCKING animations.
+ *
+ * flow_swap and the cascade interpreter own the CPU for the whole
+ * animation — dozens of frames — and pump this hook after each vsync.
+ * Without it, anything the main loop would have drawn simply stops:
+ * rta_play_swap pins the cursor bracket to the swap's easing curve
+ * with rtc_ride(), but a pinned position that nothing renders leaves
+ * the bracket parked at the origin until the loop resumes, and then
+ * it teleports to the destination in one frame.
+ *
+ * tile_selected is already cleared by the time a swap starts, so the
+ * bracket draws in its normal mode while it rides. */
+static void classic_frame_hook(void)
+{
+    frame_counter++;
+    rtc_draw(frame_counter, tile_selected ? 1 : 0);
+}
+
 static void classic_run(void)
 {
     uint8_t keys, pressed;
@@ -204,6 +222,7 @@ static void classic_run(void)
     sync_state();
     rtc_snap(cursor_x, cursor_y);
     rtc_invalidate();
+    rta_set_frame_hook(classic_frame_hook);
     prev_keys = joypad();
 
     while (1) {
@@ -219,6 +238,18 @@ static void classic_run(void)
             debug_req = DBG_NONE;
             if (d == 0) y2--; else if (d == 1) y2++;
             else if (d == 2) x2--; else x2++;
+            /* Take the cursor through the same motions a player's
+               swap would: teleport to the source, then let the
+               bracket ride to the destination. debug.h promises this
+               path behaves "exactly like a player swap", and a
+               harness path that skips the cursor cannot see cursor
+               bugs. */
+            cursor_x = x;
+            cursor_y = y;
+            rtc_snap(cursor_x, cursor_y);
+            tile_selected = 0;
+            cursor_x = x2;
+            cursor_y = y2;
             if (do_swap(x, y, x2, y2)) return;
             continue;
         }

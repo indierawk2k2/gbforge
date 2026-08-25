@@ -44,24 +44,39 @@ def test_classic_open_matches_golden(in_game):
         HARNESS, "output", "failures"))
 
 
-def test_reverted_swap_leaves_no_pixel_trace(in_game, bus):
+def _board_tilemap(gb):
+    """The BG tilemap + attributes covering the board.
+
+    Read straight out of VRAM rather than sampled off the frame: the
+    cursor is a sprite, and a sprite that legitimately moved would
+    otherwise read as a board that changed.
+    """
+    rows = []
+    for r in range(1, 17):                      # hw tile rows 1..16
+        base = 0x9800 + r * 32 + 1              # board starts at col 1
+        rows.append((gb.read_vram(0, base, 16), gb.read_vram(1, base, 16)))
+    return rows
+
+
+def test_reverted_swap_leaves_no_stale_tiles(in_game, bus):
     """A swap that doesn't match animates out and back. When it
-    settles, the screen must be pixel-identical to before it started —
-    a stale tile left at the destination is invisible to any memory
-    assertion."""
+    settles, the board's tilemap must be identical to before it
+    started — a stale tile left at the destination is invisible to any
+    assertion on board[][], because the model was restored correctly.
+    """
     from test_gameplay import board_with_pending_match
 
     bus.load_board(board_with_pending_match())
     in_game.run_frames(20)
-    before = Frame.grab(in_game)
+    before = _board_tilemap(in_game)
 
     bus.trigger_swap(0, 0, bus.RIGHT)      # checkerboard corner: no match
     in_game.run_frames(90)
 
-    after = Frame.grab(in_game)
-    diff = after.diff_count(before, BOARD_RECT, tolerance=0)
-    assert diff == 0, (
-        f"{diff} board pixels changed across a reverted swap")
+    after = _board_tilemap(in_game)
+    bad = [r for r in range(16) if after[r] != before[r]]
+    assert not bad, (
+        f"board tilemap rows {bad} changed across a reverted swap")
 
 
 def test_board_is_stable_when_idle(in_game):

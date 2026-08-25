@@ -57,8 +57,39 @@ class MerlinFont:
         return cls(recode, widths, glyphs)
 
     def width_px(self, text):
+        """Total advance, trailing sidebearing included."""
         return sum(self.widths[self.recode[ord(c)]]
                    for c in text if ord(c) < 128)
+
+    def _glyph_ink(self, gi):
+        cols = [b for b in range(8)
+                if any(row & (0x80 >> b) for row in self.bitmaps[gi])]
+        return (min(cols), max(cols)) if cols else (0, 0)
+
+    def ink_width_px(self, text):
+        """Width of the actual marks. Layout that has to line up with
+        something else must measure ink, not advance — the bearing
+        after the last glyph is not part of what a reader sees."""
+        chars = [c for c in text if ord(c) < 128]
+        pen, first, last = 0, None, 0
+        for c in chars:
+            gi = self.recode[ord(c)]
+            if any(self.bitmaps[gi]):
+                x0, x1 = self._glyph_ink(gi)
+                if first is None:
+                    first = pen + x0
+                last = pen + x1
+            pen += self.widths[gi]
+        return 0 if first is None else last - first + 1
+
+    def ink_lead_px(self, text):
+        """Left bearing of the first inked glyph."""
+        for c in text:
+            if ord(c) < 128:
+                gi = self.recode[ord(c)]
+                if any(self.bitmaps[gi]):
+                    return self._glyph_ink(gi)[0]
+        return 0
 
     def bake_line_at(self, text, tiles, ink_off_px):
         """Bake with the ink starting at ink_off_px inside the run

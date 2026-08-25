@@ -57,8 +57,10 @@ class TitleScreen:
     palettes so re-skins can't shift the logo colors (each entry is
     4 RGB555 (r,g,b) tuples)."""
     menu: Menu
-    logo_letters: int = 7          # tiles = letters * 4
-    logo_pos: tuple = (3, 4)
+    logo_text: str = ""            # baked in the 16x16 display face;
+                                   # empty falls back to the game name
+    logo_pos: tuple = (3, 4)       # only y is used — x is computed by
+                                   # centring the ink at pixel precision
     deco_pos: tuple = (4, 7)
     deco_palettes: tuple = ("fire", "fire", "gold", "gold",
                             "earth", "earth", "water", "water",

@@ -17,13 +17,15 @@
 
 typedef struct {
     const uint8_t *tiles;   /* UI-letter tile indices */
-    uint8_t len;
-    uint8_t value;          /* returned on confirm    */
+    uint8_t n_tiles;        /* baked run width (tiles)          */
+    uint8_t value;          /* returned on confirm              */
+    uint8_t arrow_x;        /* two tiles left of the label ink
+                               (per item: labels are pixel-
+                               centered so ink start varies)     */
 } ng_menu_item;
 
 typedef struct {
-    uint8_t arrow_x, first_y;
-    uint8_t label_x;
+    uint8_t run_x, first_y; /* where the baked runs sit          */
     uint8_t row_step;
     uint8_t count;
     const ng_menu_item *items;

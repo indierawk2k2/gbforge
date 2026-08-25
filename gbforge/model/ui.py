@@ -93,4 +93,4 @@ class Overlay:
     size: tuple
     lines: list = field(default_factory=list)
     border: BorderStyle = field(default_factory=BorderStyle)
-    font: str = "default"
+    font: str = "merlin"

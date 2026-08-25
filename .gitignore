@@ -11,3 +11,14 @@ obj_debug/
 /gbdk
 .DS_Store
 *.sav
+
+# harness: fetched dependency, build outputs, and regenerable caches
+harness/sameboy/
+harness/build/
+harness/output/
+harness/checkpoints/cache/
+harness/pygb/symbols.py
+harness/pygb/symbols.json
+harness/include/gbf_symbols.h
+tests/build/
+.pytest_cache/

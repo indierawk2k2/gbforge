@@ -15,11 +15,13 @@
 #include "tiles_data.h"
 #include "palettes.h"
 #include "title_logo.h"   /* TITLE_LOGO_TILE_BASE — res contract */
+#include "merlin_font.h"   /* VWF_POOL_BASE — res contract */
 
 static void draw_arrow(const ng_menu *m, uint8_t row, uint8_t tile)
 {
     uint8_t t = tile;
-    set_bkg_tiles(m->arrow_x, m->first_y + row * m->row_step, 1, 1, &t);
+    set_bkg_tiles(m->items[row].arrow_x,
+                  m->first_y + row * m->row_step, 1, 1, &t);
 }
 
 uint8_t rtt_show(const ng_title *t) BANKED
@@ -76,12 +78,21 @@ uint8_t rtt_show(const ng_title *t) BANKED
         set_bkg_tiles(t->deco_x, t->deco_y, t->deco_n, 1, deco);
     }
 
-    /* menu labels + arrow */
-    for (i = 0; i < t->menu.count; i++) {
-        set_bkg_tiles(t->menu.label_x,
-                      t->menu.first_y + i * t->menu.row_step,
-                      t->menu.items[i].len, 1,
-                      (uint8_t *)t->menu.items[i].tiles);
+    /* menu labels: baked pixel-centered runs streamed through the
+       VWF pool (36 tiles for three items — pool holds 46) */
+    {
+        uint8_t base = VWF_POOL_BASE;
+        uint8_t buf[20];
+        uint8_t c;
+        for (i = 0; i < t->menu.count; i++) {
+            const ng_menu_item *it = &t->menu.items[i];
+            set_bkg_data(base, it->n_tiles, it->tiles);
+            for (c = 0; c < it->n_tiles && c < 20; c++) buf[c] = base + c;
+            set_bkg_tiles(t->menu.run_x,
+                          t->menu.first_y + i * t->menu.row_step,
+                          it->n_tiles, 1, buf);
+            base += it->n_tiles;
+        }
     }
     draw_arrow(&t->menu, 0, UI_TILE_ARROW);
 

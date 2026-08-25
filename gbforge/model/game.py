@@ -37,7 +37,8 @@ class Game:
     quest: object = None       # QuestGraph (model.quest)
     audio: object = None       # AudioTheme (model.audio)
     scoring: object = None     # Scoring (model.scoring); None = defaults
-    ui_strings: dict = None    # name -> text, baked by gen_ui (games with VWF fonts)
+    ui_strings: dict = None    # name -> text, baked by gen_ui
+    ui_counters: dict = None   # name -> (label, n_digits), baked
 
     def mode_index(self, name):
         for i, m in enumerate(self.modes):

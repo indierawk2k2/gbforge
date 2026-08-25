@@ -17,6 +17,11 @@ RES = res
 OBJ = obj$(if $(DEBUG),_debug,)
 DEBUGFLAGS = $(if $(DEBUG),-DDEBUG_BUILD,)
 
+# Retail and dev ROMs coexist: the harness drives the dev ROM through
+# the mailbox and diffs its behaviour against the retail build, so one
+# must not overwrite the other (their .noi symbol tables differ too).
+ROM = cascadia$(if $(DEBUG),-debug,).gbc
+
 LCCFLAGS = -Wm-yC -Wm-yt0x1B -Wm-yo32 -Wm-ya1 -Wl-j -Wl-m $(DEBUGFLAGS)
 INC = -I. -I$(RUNTIME) -I$(GEN) -I$(RES)
 
@@ -30,7 +35,7 @@ OBJS = $(OBJ)/main_cascadia.o \
        $(GEN_OBJS:%=$(OBJ)/%.o) \
        $(RES_OBJS:%=$(OBJ)/%.o)
 
-all: prepare cascadia.gbc
+all: prepare $(ROM)
 
 # Every object depends on every header. Coarse, but correct: a struct
 # change in engine.h relinked against objects compiled with the old
@@ -67,11 +72,11 @@ $(OBJ)/%.o: $(GEN)/%.c
 $(OBJ)/%.o: $(RES)/%.c
 	$(LCC) $(LCCFLAGS) $(INC) -c -o $@ $<
 
-cascadia.gbc: $(OBJS)
+$(ROM): $(OBJS)
 	$(LCC) $(LCCFLAGS) -o $@ $(OBJS)
-	python3 $(ROOT)/scripts/check_banks.py cascadia.noi
+	python3 $(ROOT)/scripts/check_banks.py $(@:.gbc=.noi)
 
 clean:
-	rm -rf obj obj_debug
+	rm -rf obj obj_debug cascadia-debug.gbc cascadia-debug.noi cascadia-debug.map cascadia-debug.sym
 
 .PHONY: all debug gen res prepare clean

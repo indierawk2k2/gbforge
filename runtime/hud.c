@@ -41,6 +41,34 @@ static const uint8_t digit_ones[100] = {
 static uint16_t last_knowledge;
 static uint8_t knowledge_visible = 1;
 
+/* Sidebar counters — one row per board kind. The runtime attaches no
+ * meaning to a kind: the res contract names the palette, the game
+ * passes the counts, and this table is the only place their screen
+ * order lives.
+ *
+ * `digit` selects which of the res pack's digit sets the row draws
+ * with. They are aliases here because every row is tile-aligned. A
+ * game that stacks counters at a tighter-than-8px pitch points each
+ * row at a PRE-SHIFTED set instead (UI_TILE_DIGIT_S1_0 and friends):
+ * the glyphs are baked already scrolled down N pixels and split
+ * across the tile-row boundary, which is how a background layer with
+ * no per-counter scroll register still lands text off the grid. */
+#define RTH_KINDS 4
+
+typedef struct {
+    uint8_t row;    /* window row                       */
+    uint8_t pal;    /* res palette index for the icon    */
+    uint8_t icon;   /* swatch tile                       */
+    uint8_t digit;  /* base tile of this row's digit set */
+} rth_kind_row;
+
+static const rth_kind_row kind_row[RTH_KINDS] = {
+    { 0, PAL_FIRE,   UI_TILE_ROUND3, UI_TILE_DIGIT_0 },
+    { 1, PAL_WATER,  UI_TILE_ROUND3, UI_TILE_DIGIT_0 },
+    { 2, PAL_EARTH,  UI_TILE_ROUND3, UI_TILE_DIGIT_0 },
+    { 3, PAL_BRONZE, UI_TILE_ROUND3, UI_TILE_DIGIT_0 },
+};
+
 static void draw_border(void)
 {
     uint8_t attr_row[18];
@@ -88,15 +116,11 @@ static void draw_sidebar_layout(void)
         uint8_t attrs[3] = { PAL_SILVER, PAL_SILVER, PAL_SILVER };
         set_win_tiles(0, row, 3, 1, attrs);
     }
-    {
-        uint8_t fire_attr[3]  = { PAL_FIRE,  PAL_SILVER, PAL_SILVER };
-        uint8_t water_attr[3] = { PAL_WATER, PAL_SILVER, PAL_SILVER };
-        uint8_t earth_attr[3] = { PAL_EARTH, PAL_SILVER, PAL_SILVER };
-        set_win_tiles(0, 0, 3, 1, fire_attr);
-        set_win_tiles(0, 1, 3, 1, water_attr);
-        set_win_tiles(0, 2, 3, 1, water_attr);
-        set_win_tiles(0, 3, 3, 1, earth_attr);
-        set_win_tiles(0, 4, 3, 1, earth_attr);
+    for (row = 0; row < RTH_KINDS; row++) {
+        uint8_t attrs[3];
+        attrs[0] = kind_row[row].pal;
+        attrs[1] = attrs[2] = PAL_SILVER;
+        set_win_tiles(0, kind_row[row].row, 3, 1, attrs);
     }
 
     VBK_REG = VBK_TILES;
@@ -114,43 +138,30 @@ void rth_init(void) BANKED
     draw_border();
     draw_sidebar_layout();
     last_knowledge = 0xFFFF;
-    rth_update(0, 0, 0, 0);
+    rth_update(0, 0);
     SHOW_WIN;
 }
 
-void rth_update(uint8_t fire, uint8_t water, uint8_t earth,
-                uint16_t kp) BANKED
+void rth_update(const uint8_t *kind_counts, uint16_t kp) BANKED
 {
     uint8_t x = KNOWLEDGE_SCREEN_X + 8;
     uint8_t y = KNOWLEDGE_SCREEN_Y + 16;
     uint8_t top, bottom;
     uint8_t r[3];
+    uint8_t k;
 
     VBK_REG = VBK_TILES;
-    /* fire (row 0), water (overflow row 1 + main row 2, 1px shift),
-       earth (overflow row 3 + main row 4, 2px shift) */
-    r[0] = UI_TILE_ROUND3;
-    r[1] = UI_TILE_DIGIT_0 + digit_tens[fire];
-    r[2] = UI_TILE_DIGIT_0 + digit_ones[fire];
-    set_win_tiles(0, 0, 3, 1, r);
-
-    r[0] = UI_TILE_ROUND_OV1;
-    r[1] = UI_TILE_DIGIT_OV1_0 + digit_tens[water];
-    r[2] = UI_TILE_DIGIT_OV1_0 + digit_ones[water];
-    set_win_tiles(0, 1, 3, 1, r);
-    r[0] = UI_TILE_ROUND_S1;
-    r[1] = UI_TILE_DIGIT_S1_0 + digit_tens[water];
-    r[2] = UI_TILE_DIGIT_S1_0 + digit_ones[water];
-    set_win_tiles(0, 2, 3, 1, r);
-
-    r[0] = UI_TILE_ROUND_OV2;
-    r[1] = UI_TILE_DIGIT_OV2_0 + digit_tens[earth];
-    r[2] = UI_TILE_DIGIT_OV2_0 + digit_ones[earth];
-    set_win_tiles(0, 3, 3, 1, r);
-    r[0] = UI_TILE_ROUND_S2;
-    r[1] = UI_TILE_DIGIT_S2_0 + digit_tens[earth];
-    r[2] = UI_TILE_DIGIT_S2_0 + digit_ones[earth];
-    set_win_tiles(0, 4, 3, 1, r);
+    /* Counts saturate at 99 rather than wrapping: the two-digit
+       lookup tables are only 100 entries, and a wrapped 100 -> 00
+       reads as a counter that reset. */
+    for (k = 0; k < RTH_KINDS; k++) {
+        uint8_t n = kind_counts ? kind_counts[k] : 0;
+        if (n > 99) n = 99;
+        r[0] = kind_row[k].icon;
+        r[1] = kind_row[k].digit + digit_tens[n];
+        r[2] = kind_row[k].digit + digit_ones[n];
+        set_win_tiles(0, kind_row[k].row, 3, 1, r);
+    }
 
     /* knowledge counter sprites: K + 4 digits (timer owns the
        slots when hidden — legacy bug-2 contract) */

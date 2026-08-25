@@ -175,6 +175,101 @@ def glyph(ch, color=3):
     return [[color if bit == "1" else 0 for bit in row] for row in rows]
 
 
+def vwf_font():
+    """VWF font tables baked from FONT, in the res contract's shape.
+
+    The runtime never composes text at run time — gbforge's gen_ui
+    bakes each overlay line into ready-to-upload tiles at build time —
+    so this is build-time data, not ROM data. It ships as C because
+    the same tables in a real game ARE compiled in (for dialogue and
+    any runtime-composed string), and the codegen parses one format.
+
+    Returns (recode[128], widths[n], bitmaps[n*8], order) where a
+    glyph's width is its ink extent plus one column of side bearing,
+    which is what makes the font proportional: "1" is narrower than
+    "W" and centering lands on real pixels rather than tile edges.
+    """
+    order = [" "] + sorted(FONT)
+    recode = [0] * 128
+    widths, bitmaps = [], []
+    for idx, ch in enumerate(order):
+        rows = FONT.get(ch, ["00000000"] * 8)
+        bits = [int(r, 2) for r in rows]
+        ink = 0
+        for b in bits:
+            for x in range(8):
+                if b & (0x80 >> x):
+                    ink = max(ink, x + 1)
+        widths.append(min(8, ink + 1) if ink else 3)   # space = 3px
+        bitmaps.append(bits)
+        if ch != " ":
+            recode[ord(ch)] = idx
+            if ch.isalpha():
+                recode[ord(ch.lower())] = idx          # fold lowercase
+    return recode, widths, bitmaps, order
+
+
+def emit_vwf_font(hdr, pool_base, pool_size):
+    """(merlin_font.c, merlin_font.h) source text."""
+    recode, widths, bitmaps, order = vwf_font()
+
+    rows = []
+    for i in range(0, 128, 16):
+        rows.append("    " + ", ".join(f"{v:3d}" for v in recode[i:i + 16])
+                    + f",  // 0x{i:02X}-0x{i + 15:02X}")
+    recode_c = "\n".join(rows)
+
+    width_c = "\n".join(
+        "    " + ", ".join(str(w) for w in widths[i:i + 12]) + ","
+        for i in range(0, len(widths), 12))
+
+    glyph_c = "\n".join(
+        "    " + ", ".join(f"0x{b:02X}" for b in bitmaps[i]) +
+        f",  // {i}: {order[i] if order[i] != ' ' else 'SPC'}"
+        for i in range(len(bitmaps)))
+
+    c = (hdr + f"""
+/* Proportional 1bpp font, MSB-left, 8 rows per glyph.
+ *
+ * BUILD-TIME DATA: gbforge's gen_ui parses these tables to bake
+ * overlay text into tiles. Nothing links this file into the ROM,
+ * which is why it needs no GBDK headers.
+ */
+
+#include <stdint.h>
+
+const uint8_t merlin_recode[128] = {{
+{recode_c}
+}};
+
+const uint8_t merlin_widths[{len(widths)}] = {{
+{width_c}
+}};
+
+const uint8_t merlin_bitmaps[{len(bitmaps) * 8}] = {{
+{glyph_c}
+}};
+""")
+
+    h = (hdr + f"""#ifndef MERLIN_FONT_H
+#define MERLIN_FONT_H
+
+/* VWF tile pool — the runtime asset contract.
+ *
+ * ui_show_overlay() uploads an overlay's baked text spans starting at
+ * VWF_POOL_BASE. The pool sits above every statically-loaded tile so
+ * an overlay can never clobber board, UI, or icon graphics; it DOES
+ * share the ghost/logo range, which is safe because the two never
+ * appear on screen together (see tiles_data.h).
+ */
+#define VWF_POOL_BASE  {pool_base}
+#define VWF_POOL_SIZE  {pool_size}
+
+#endif
+""")
+    return c, h
+
+
 def small_glyph(ch, color=3):
     """5x5-ish reduction of a glyph for the small-digit set."""
     g = glyph(ch, color)
@@ -723,6 +818,16 @@ extern const uint8_t title_logo_tiles[];
 
 #endif
 """)
+    # VWF pool: above the title logo (title-only) and above the ghost
+    # tiles any board type this example can hold (types 0-4 -> 188-207).
+    # Overlay text and in-flight refill ghosts therefore never collide.
+    pool_base = 48 + len(ui) + len(icons) + n_logo * 4
+    pool_size = 256 - pool_base
+    assert pool_base + pool_size <= 256, "VWF pool overflows the tile space"
+    font_c, font_h = emit_vwf_font(hdr, pool_base, pool_size)
+    open(os.path.join(out, "merlin_font.c"), "w").write(font_c)
+    headers["merlin_font.h"] = font_h
+
     for name, text in headers.items():
         open(os.path.join(out, name), "w").write(text)
 

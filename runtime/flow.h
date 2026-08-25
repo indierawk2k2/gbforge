@@ -3,7 +3,7 @@
 
 /* gbforge runtime — THE swap→match→cascade choreography.
  *
- * The original game hand-wrote this sequence six times (main, puzzle,
+ * The original game hand-wrote this sequence six times (main.c, puzzle,
  * timed x2, battle x2) and the copies drifted: puzzle lost its shake,
  * practice dropped a spell hook, cursor snap-back existed in only
  * three. Here it exists ONCE; per-mode differences are data

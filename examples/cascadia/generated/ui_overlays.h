@@ -7,4 +7,9 @@
 extern const ng_overlay ovl_win;
 extern const ng_overlay ovl_lose;
 
+#define OVL_WIN_LINE0_DY 1
+#define OVL_WIN_LINE1_DY 2
+#define OVL_LOSE_LINE0_DY 1
+#define OVL_LOSE_LINE1_DY 2
+
 #endif

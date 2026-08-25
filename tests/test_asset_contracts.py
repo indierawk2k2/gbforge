@@ -259,3 +259,56 @@ def test_display_face_has_one_cap_height():
         + "; ".join(f"rows {t}..{b} -> {''.join(cs)}"
                     for (t, b), cs in sorted(extents.items())))
     assert len(widths) * 32 == len(bitmaps)
+
+
+# Letters whose strokes are all uprights, bowls, or shallow curves —
+# every horizontal cut through their middle crosses full-weight
+# strokes. Excluded, with reasons:
+#
+#   D          the bowl's right side is 2px by design, lighter than
+#              the stem the way a drawn bowl is
+#   M W Q      2px where two diagonals meet at a vertex, and Q's tail
+#   V X 0 4    diagonals, which are optically lighter at this size
+#
+# Those are drawing decisions. An upright that is simply a pixel too
+# thin is not, which is what this separates.
+STRAIGHT_SIDED = "ABCEFGHIJKLNOPRSTUYZ12356789"
+
+
+def _mid_cap_runs(rows):
+    """Horizontal ink run lengths across the middle of the cap."""
+    inked = [i for i, v in enumerate(rows) if v]
+    top, bot = min(inked), max(inked)
+    out = set()
+    for r in range(top + 5, min(top + 10, bot + 1)):
+        n = 0
+        for x in range(16):
+            if rows[r] & (1 << (15 - x)):
+                n += 1
+            elif n:
+                out.add(n)
+                n = 0
+        if n:
+            out.add(n)
+    return out
+
+
+def test_display_face_stems_carry_the_face_weight():
+    """Upright strokes must be the face's full 3px weight.
+
+    The 16px I shipped with a 2px stem in an otherwise 3px face and
+    read as a lighter letter inside a word; T and Y had the same
+    defect where no logo had yet shown them. This makes that a build
+    failure instead of something to catch on a real screen.
+    """
+    recode = _title_table("title_recode")
+    bitmaps = _title_table("title_bitmaps")
+
+    thin = {}
+    for ch in STRAIGHT_SIDED:
+        runs = _mid_cap_runs(_title_glyph_rows(recode[ord(ch)], bitmaps))
+        if runs and min(runs) < 3:
+            thin[ch] = sorted(runs)
+    assert not thin, (
+        "display-face glyphs with an under-weight upright: "
+        + ", ".join(f"{c} {w}" for c, w in sorted(thin.items())))

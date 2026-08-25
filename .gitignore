@@ -22,3 +22,5 @@ harness/pygb/symbols.json
 harness/include/gbf_symbols.h
 tests/build/
 .pytest_cache/
+tools/*/.build/
+tools/*/*.app/

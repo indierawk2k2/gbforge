@@ -8,7 +8,12 @@ examples generate them procedurally so the repository ships zero
 borrowed art. Everything here is deliberately placeholder: flat-color
 gems with distinct shapes, a plain block font, one-pixel borders.
 
-Usage: gen_placeholder_res.py <out_dir> [--logo TEXT]
+Usage: gen_placeholder_res.py <out_dir> [--logo TEXT] [--force]
+
+EDITOR-OWNED files (tiles_data.c, palettes.c, spell_icons.c) are only
+SEEDED: if they already exist they are left alone, because by then an
+artist has been in them and this script's output is not an
+improvement. Pass --force to overwrite deliberately.
 
 Also writes <out_dir>/../art/<gem>.png previews (pure-python PNG).
 """
@@ -438,6 +443,13 @@ GEMS = [("ruby", "diamond"), ("emerald", "square"),
         ("topaz", "triangle"), ("onyx", "circle")]
 
 # RGB555 palettes: bg 0-3 = gem colors on white; PAL 4-7 utility
+# Slot names double as the PAL_* macro names the runtime compiles
+# against AND the "// Name (N)" comments the sprite editor's importer
+# reads back — one list, so a re-ordered palette can't mean two
+# different things to the two tools.
+PALETTE_NAMES = ("Fire", "Water", "Earth", "Bronze",
+                 "Dark", "Gold", "Ruby", "Silver")
+
 PALETTES = [
     # (white, shine, fill, outline)
     ((31, 31, 31), (31, 22, 24), (26, 4, 8),  (10, 1, 2)),    # ruby
@@ -472,6 +484,33 @@ def main():
     logo = "GBFORGE"
     if "--logo" in sys.argv:
         logo = sys.argv[sys.argv.index("--logo") + 1].upper()
+    force = "--force" in sys.argv
+
+    # Files the art tools round-trip. Seeded once, then theirs.
+    EDITOR_OWNED = {"tiles_data.c", "palettes.c", "spell_icons.c"}
+    skipped = []
+
+    def owned_path(name):
+        """Path to write, or None if an editor owns it and it exists."""
+        path = os.path.join(out, name)
+        if name in EDITOR_OWNED and os.path.exists(path) and not force:
+            skipped.append(name)
+            return None
+        return path
+
+    class _Skip:
+        def write(self, _):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    def open_res(name, mode="w"):
+        path = owned_path(name)
+        return _Skip() if path is None else open(path, mode)
     os.makedirs(out, exist_ok=True)
     art_dir = os.path.join(out, "..", "art")
     os.makedirs(art_dir, exist_ok=True)
@@ -573,32 +612,69 @@ def main():
     spr[55] = glyph("M"); spr[56] = glyph("V")
     spr[67] = glyph("C")
 
+    # Palettes go out in the editors' exchange format: RGB() macros
+    # with a "// Name (index)" line per slot. The index in the parens
+    # is authoritative — the importer does not trust position, because
+    # a slot can be renamed or annotated without moving.
+    def emit_palettes(f, name):
+        f.write(f"const uint16_t {name}[8 * 4] = {{\n")
+        for i, p in enumerate(PALETTES):
+            f.write(f"    // {PALETTE_NAMES[i]} ({i})\n")
+            f.write("    " + ", ".join(
+                f"RGB({c[0]:2d}, {c[1]:2d}, {c[2]:2d})" for c in p)
+                + ",\n")
+        f.write("};\n")
+
     def emit_tiles(name, tiles):
+        """Emit an UNSIZED array, matching what the editors export.
+
+        The editors' importers grep for `name[]`; a sized declaration
+        reads as a different symbol and the round trip fails at the
+        boundary rather than in either tool. The element count lives
+        in the comment, where it informs without being a contract."""
         data = []
         for t in tiles:
             data += tile_2bpp(t)
-        return (f"const uint8_t {name}[{len(data)}] = {{\n"
+        return (f"/* {len(tiles)} tiles, {len(data)} bytes */\n"
+                f"const uint8_t {name}[] = {{\n"
                 + fmt_bytes(data) + "\n};\n\n")
 
-    with open(os.path.join(out, "tiles_data.c"), "w") as f:
-        f.write(hdr + '#include <stdint.h>\n#include "tiles_data.h"\n#include "title_logo.h"\n\n')
-        f.write(emit_tiles("tile_data", game_tiles))
-        f.write(emit_tiles("ui_tile_data", ui))
-        f.write(emit_tiles("spell_icon_tile_data", icons))
-        f.write(emit_tiles("title_logo_tiles", logo_tiles))
-        # ghost variants: refill drop-in transit tiles (fade map
-        # 3->2, 2->1, matching the private pack's derivation)
-        fade = {0: 0, 1: 1, 2: 1, 3: 2}
-        ghosts = [[[fade[v] for v in row] for row in t]
-                  for t in game_tiles]
-        f.write(emit_tiles("ghost_tile_data", ghosts))
+    # ── res file ownership ──────────────────────────────────────────
+    #
+    # tiles_data.c and palettes.c are EDITOR-OWNED: the sprite editor
+    # imports them, an artist edits, and the editor writes them back.
+    # This generator only seeds them. Everything the editor does not
+    # round-trip lives in its own file so an export can never delete
+    # it — the failure that would otherwise turn "artist saved their
+    # work" into "the ROM no longer links".
+    #
+    # ghost_tiles.c is DERIVED from tiles_data.c on every build (see
+    # scripts/derive_ghost_tiles.py), so re-drawn gems get matching
+    # faded variants without anyone drawing them twice.
+
+    with open_res("tiles_data.c") as f:
+        f.write(hdr + '#include <gb/cgb.h>\n#include "tiles_data.h"\n\n')
         f.write(f"const uint8_t tile_palette_map[][4] = {{\n")
         for row in pal_map:
             f.write("    { " + ", ".join(str(v) for v in row) + " },\n")
-        f.write("};\n")
+        f.write("};\n\n")
+        f.write(emit_tiles("tile_data", game_tiles))
 
-    with open(os.path.join(out, "sprites_data.c"), "w") as f:
-        f.write(hdr + '#include <stdint.h>\n#include "sprites_data.h"\n\n')
+    with open_res("ui_tiles.c") as f:
+        f.write(hdr + '#include <stdint.h>\n#include "tiles_data.h"\n'
+                      '#include "title_logo.h"\n\n')
+        f.write(emit_tiles("ui_tile_data", ui))
+        f.write(emit_tiles("title_logo_tiles", logo_tiles))
+
+    with open_res("spell_icons.c") as f:
+        f.write(hdr + '#include <stdint.h>\n#include "tiles_data.h"\n\n')
+        f.write(emit_tiles("spell_icon_tile_data", icons))
+
+    with open_res("sprites_data.c") as f:
+        f.write(hdr + '#include <gb/cgb.h>\n#include "sprites_data.h"\n'
+                      '#include "palettes.h"\n\n')
+        emit_palettes(f, "sprite_palettes")
+        f.write("\n")
         f.write(emit_tiles("cursor_sprite_data", spr[0:8]))
         f.write(emit_tiles("knowledge_sprite_data", spr[8:19]))
         f.write(emit_tiles("burst_sprite_data", spr[19:22]))
@@ -608,17 +684,15 @@ def main():
         f.write(emit_tiles("moves_sprite_data", spr[55:67]))
         f.write(emit_tiles("opp_knowledge_sprite_data", spr[67:68]))
 
-    with open(os.path.join(out, "palettes.c"), "w") as f:
-        f.write(hdr + '#include <stdint.h>\n#include "palettes.h"\n\n')
-        f.write("const uint16_t bg_palettes[32] = {\n")
-        for p in PALETTES:
-            f.write("    " + ", ".join(f"0x{rgb555(c):04X}"
-                                       for c in p) + ",\n")
-        f.write("};\n\nconst uint16_t sprite_palettes[32] = {\n")
-        for p in PALETTES:
-            f.write("    " + ", ".join(f"0x{rgb555(c):04X}"
-                                       for c in p) + ",\n")
-        f.write("};\n")
+    # palettes.c is editor-owned and holds ONLY bg_palettes, because
+    # that is all the editor round-trips. sprite_palettes lives with
+    # the generated sprite data: an export that rewrote palettes.c
+    # would otherwise silently delete a symbol the runtime links
+    # against, and the first sign of it is a linker error four steps
+    # later.
+    with open_res("palettes.c") as f:
+        f.write(hdr + '#include <gb/cgb.h>\n#include "palettes.h"\n\n')
+        emit_palettes(f, "bg_palettes")
 
     n_logo = len(logo)
     # ghosts SHARE the logo's tile range: the logo lives only on the
@@ -834,6 +908,9 @@ extern const uint8_t title_logo_tiles[];
     n_tiles = len(game_tiles) + len(ui) + len(icons) + len(logo_tiles)
     print(f"gen_placeholder_res: {n_tiles} bg tiles, {len(spr)} sprite "
           f"tiles, 8 palettes -> {out}")
+    if skipped:
+        print(f"gen_placeholder_res: kept editor-owned "
+              f"{', '.join(sorted(skipped))} (--force to overwrite)")
 
 
 if __name__ == "__main__":

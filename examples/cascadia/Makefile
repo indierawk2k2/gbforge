@@ -28,7 +28,11 @@ INC = -I. -I$(RUNTIME) -I$(GEN) -I$(RES)
 RUNTIME_OBJS = engine vram anim flow ui_core hud title ability \
                reset cursor debug sound_glue_stub
 GEN_OBJS = mode_config ui_overlays anim_tables title_config scoring_config
-RES_OBJS = tiles_data sprites_data palettes
+# res ownership: tiles_data.c + palettes.c are editor-owned (the
+# sprite editor round-trips them); ui_tiles.c, spell_icons.c and
+# sprites_data.c are generated; ghost_tiles.c is DERIVED from the
+# editor's tile art on every build.
+RES_OBJS = tiles_data sprites_data palettes ui_tiles spell_icons ghost_tiles
 
 OBJS = $(OBJ)/main_cascadia.o \
        $(RUNTIME_OBJS:%=$(OBJ)/%.o) \
@@ -42,7 +46,7 @@ all: prepare $(ROM)
 # layout yields a ROM whose engine and animator disagree about where
 # the event list lives — a silent, playable, wrong ROM.
 HDRS = $(wildcard *.h $(RUNTIME)/*.h $(GEN)/*.h $(RES)/*.h)
-$(OBJS): $(HDRS) | $(OBJ)
+$(OBJS): $(HDRS) $(RES)/ghost_tiles.c | $(OBJ)
 
 $(OBJ):
 	@mkdir -p $@
@@ -56,6 +60,12 @@ gen:
 
 res:
 	python3 $(ROOT)/scripts/gen_placeholder_res.py $(RES) --logo CASCADIA
+	python3 $(ROOT)/scripts/derive_ghost_tiles.py $(RES)
+
+# Ghost tiles track the editor-owned art automatically: redraw a gem,
+# rebuild, and its faded refill variant follows.
+$(RES)/ghost_tiles.c: $(RES)/tiles_data.c $(ROOT)/scripts/derive_ghost_tiles.py
+	python3 $(ROOT)/scripts/derive_ghost_tiles.py $(RES)
 
 prepare:
 	@mkdir -p $(OBJ)

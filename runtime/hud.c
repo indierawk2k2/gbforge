@@ -62,11 +62,14 @@ typedef struct {
     uint8_t digit;  /* base tile of this row's digit set */
 } rth_kind_row;
 
+/* ROUND2, not ROUND3: the swatch is drawn in each palette's FILL
+ * colour. Colour 3 is the outline shade, which is near-black in every
+ * palette — four black dots identify nothing. */
 static const rth_kind_row kind_row[RTH_KINDS] = {
-    { 0, PAL_FIRE,   UI_TILE_ROUND3, UI_TILE_DIGIT_0 },
-    { 1, PAL_WATER,  UI_TILE_ROUND3, UI_TILE_DIGIT_0 },
-    { 2, PAL_EARTH,  UI_TILE_ROUND3, UI_TILE_DIGIT_0 },
-    { 3, PAL_BRONZE, UI_TILE_ROUND3, UI_TILE_DIGIT_0 },
+    { 0, PAL_FIRE,   UI_TILE_ROUND2, UI_TILE_DIGIT_0 },
+    { 1, PAL_WATER,  UI_TILE_ROUND2, UI_TILE_DIGIT_0 },
+    { 2, PAL_EARTH,  UI_TILE_ROUND2, UI_TILE_DIGIT_0 },
+    { 3, PAL_BRONZE, UI_TILE_ROUND2, UI_TILE_DIGIT_0 },
 };
 
 static void draw_border(void)

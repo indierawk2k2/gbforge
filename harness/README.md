@@ -30,6 +30,6 @@ What a scenario can do, without the game knowing it is under test:
   rebuilt ROM cannot silently load a stale state — the old directory
   simply stops being used.
 
-The suite runs in about a second because almost nothing replays boot:
+The suite runs in about two seconds because almost nothing replays boot:
 `title.py` and `classic_open.py` are generated once, and every scenario
 loads one.

@@ -35,7 +35,7 @@ The division of labor is deliberate, so here it is precisely: the
 geometry and the match/gravity/cascade resolution loop live in the
 **shared runtime**; and a thin **per-game C entry point** (317 lines
 in the example) wires input edges, score and move counters, and the
-win/lose ladder to both. The second game costs 44 lines of spec plus a
+win/lose ladder to both. A second game costs 44 lines of spec and a
 ~320-line loop instead of a 3,000-line engine — and every timing and
 layout decision stays declarative and hot-tunable.
 
@@ -86,17 +86,38 @@ six-entry pixel curve, gravity accelerates on those per-step delays,
 the screen shakes on a four-run. Change a value, rebuild, and the ROM
 plays differently — no engine code touched.
 
-What it builds from, measured:
+### What a game costs
+
+Everything below is measured from this tree.
 
 | Piece | Size | Written by |
 |---|---|---|
 | `cascadia.py` — the spec | 44 lines | you |
-| `main_cascadia.c` — input edges, score/move counters, win ladder | 317 lines | you (once per game) |
-| `generated/` — config tables and baked text from the spec | 339 lines, 9 C files | gbforge |
-| `res/` — tile art, palettes, both font weights | 1,492 lines, 13 files | the sprite editor + `gen_placeholder_res.py` |
-| `runtime/` — the shared engine | 3,013 lines across 15 `.c` files (29 with headers) | written once, shared by every game |
-| `harness/` — the emulator test loop | 2,993 lines | shared |
-| `tools/sprite-editor/` — the art tool | 6,270 lines of Swift | shared |
+| `main_cascadia.c` — input edges, score and move counters, the win ladder | 317 lines | you, once per game |
+| `generated/` — config tables and baked overlay text | 339 lines, 9 files | gbforge, from the spec |
+
+**361 authored lines per game.** That is the number the whole design is
+arranged to produce, and it is the only number here that scales with
+how many games you build.
+
+### What it runs on
+
+Written once. A second game adds nothing to this column.
+
+| Piece | Size | Notes |
+|---|---|---|
+| `runtime/` — engine, animator, VRAM, HUD, title | 3,012 lines of C, 15 files | hand-written against the hardware's timing windows |
+| `gbforge/` — model, codegen, reference sim | 2,309 lines, 22 files | the abstraction and its Python twin |
+| `harness/` — headless emulator, client, scenarios | 2,992 lines | [the verification loop](#the-verification-loop) |
+| `scripts/` — asset generation, bank checker, gates | 2,081 lines | |
+| `tests/` — transcript oracle, contract tests | 435 lines | |
+| `tools/sprite-editor/` — tile and palette editor | 6,275 lines of Swift | [the art tools](#the-art-tools) |
+| `examples/cascadia/res/` — art, palettes, two font weights | 1,492 lines, 13 files | the editor + `gen_placeholder_res.py` |
+
+Roughly 10,800 lines of runtime, model, harness and gates sit under
+those 361. The ratio is the argument: the expensive half is paid once,
+and the machine that reads the spec is smaller than the runtime that
+executes it — which is the point, not an apology for it.
 
 The generated output and the built ROM are **committed on purpose**,
 so you can read the before and after without installing a toolchain:
@@ -252,8 +273,16 @@ Concretely, in this repository:
   gitignored dependencies (SameBoy's source and built library) from
   the main checkout instead of re-fetching them per worktree.
 - **[AGENTS.md](AGENTS.md) is the contract they work under** —
-  environment, the rules that keep the tree healthy, and the
-  instruction to re-measure any number that reaches this README.
+  environment, the rules that keep the tree healthy, the instruction
+  to re-measure any number that reaches this README, and the list of
+  decisions that stop and wait for a human.
+- **[docs/specs/cascadia-example.md](docs/specs/cascadia-example.md)
+  is the brief this example was built from**, published as-is: goal,
+  non-goals with their reasons, the decisions already made, a
+  verification checklist, and a definition of done. It asks for a 6×6
+  board; the example ships 8×8, because the runtime's dimensions are
+  compile-time constants and the brief says to report a gap rather
+  than route around it.
 
 The honest evidence that this matters: when this repository was
 extracted from the private project, `runtime/ui_core.c` and `title.c`
@@ -273,7 +302,7 @@ with no window and no wall clock.
 
 ```bash
 make -C harness gbctl     # fetch + build SameBoy, build gbctl (~1 min once)
-make -C harness test      # 20 scenarios, ~1.8s
+make -C harness test      # 20 scenarios, ~2s
 ```
 
 What a scenario can do:

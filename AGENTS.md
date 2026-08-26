@@ -46,6 +46,37 @@ That runs, in the order that fails fastest: codegen reproducibility,
 the engine transcript, both ROM builds, the emulator scenarios, and
 the asset boundary. **Run it before declaring anything done.**
 
+And when you report, **say which checks you actually executed and
+which you reasoned about.** Do not describe a check as passing unless
+you ran it and saw the result. A confident report of a check that was
+never run is worse than no report: it spends the reader's trust and
+removes the reason they would have looked themselves.
+
+## When to stop and ask
+
+Most decisions here are yours. These four are not, because getting
+them wrong is expensive and the damage is hard to see from inside the
+change:
+
+- **A new dependency.** The build has to keep working from a clean
+  clone with Python stdlib, GBDK, and a host C or Swift toolchain.
+  Every addition is a permanent tax on everyone who clones it.
+- **A change to a generated-file contract** — the IR the codegen
+  emits, or the res headers the runtime compiles against. Both sides
+  of a contract move independently; changing one silently is how the
+  editor once deleted a symbol the linker needed.
+- **A change to the memory plan** — bank assignments, WRAM layout,
+  the VWF tile pool. ROM banks are the one genuinely global resource,
+  and the linker reports an overflow by placing code at an address
+  that is not code.
+- **A capability the model can't express.** If the task seems to need
+  the engine changed to fit, stop and report the gap. A missing
+  capability found by real work is a useful result; routing around it
+  quietly turns it into an invisible one.
+
+In all four: report the gap and what you would do about it. Don't
+pick.
+
 ## Working in parallel
 
 Several agents at once is the expected case, and the repo is arranged
@@ -84,7 +115,7 @@ compiler and folds 10,000 boards into a transcript hash that must
 equal `gbforge/engine/sim.py`'s. Under a second. Also runs the asset
 contract checks.
 
-**`make -C harness test`** — the ROM under emulation, ~1.2s.
+**`make -C harness test`** — the ROM under emulation, ~2s.
 `harness/gbctl` links libsameboy and speaks the line protocol
 (`harness/PROTOCOL.md`); `harness/pygb` drives it. Read
 [harness/README.md](harness/README.md) first. The essentials:
@@ -150,7 +181,7 @@ it catches.
   in this codebase (`hud.c` uses a mask table because of it). If
   behaviour disagrees with the source, check the `.asm` in `obj/`.
 - **No new dependencies** — Python stdlib, GBDK, and the host C and
-  Swift toolchains. If a task seems to need one, stop and surface it.
+  Swift toolchains. See *When to stop and ask*.
 - **No borrowed assets.** Everything visual ships from
   `gen_placeholder_res.py` or the editor. Nothing from commercial
   ROMs, other projects, or unlicensed libraries goes in this tree.

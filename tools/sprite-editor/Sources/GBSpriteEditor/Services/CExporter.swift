@@ -194,7 +194,7 @@ enum CExporter {
         return out
     }
 
-    // MARK: - Game-directory generation (Alchemy-compatible)
+    // MARK: - Game-directory generation (the res/ contract)
 
     /// tiles_data.c: palette map only (tile pixel data is in tiles_gfx.c)
     private static func generateGamePaletteMapC(document: TileDocument, constants: PaletteConstants) -> String {

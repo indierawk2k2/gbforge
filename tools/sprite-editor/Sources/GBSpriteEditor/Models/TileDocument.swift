@@ -42,7 +42,7 @@ class TileDocument: ObservableObject {
 
     /// The URL of the currently loaded .gbtiles file (nil if new/unsaved).
     @Published var currentFileURL: URL?
-    /// The output directory for generated C files (e.g. alchemy/res/).
+    /// The output directory for the exported C files (the game's res/).
     @Published var outputDirectory: URL?
 
     // MARK: - Undo / Redo
@@ -180,24 +180,29 @@ class TileDocument: ObservableObject {
         canRedo = !redoStack.isEmpty
     }
 
-    /// Well-known path for the shared .gbtiles file, relative to the app bundle's parent.
-    static let defaultFileRelativePath = "../alchemy/res/tiles.gbtiles"
-    static let defaultOutputRelativePath = "../alchemy/res"
+    /// The game whose res/ this editor opens by default. A repo with
+    /// several games points this at whichever one is being worked on.
+    static let defaultGameResPath = "examples/cascadia/res"
 
-    /// Resolve paths to alchemy/res/ using the compile-time source location.
+    /// Well-known path for the shared .gbtiles file, relative to the app bundle's parent.
+    static let defaultFileRelativePath = "../\(defaultGameResPath)/tiles.gbtiles"
+    static let defaultOutputRelativePath = "../\(defaultGameResPath)"
+
+    /// Resolve paths to the game's res/ using the compile-time source location.
     /// #filePath is immune to macOS app translocation (which relocates .app bundles
     /// to a temp path on launch, breaking Bundle.main.bundleURL-relative paths).
     private static func resolveGamePaths() -> (fileURL: URL, outDir: URL) {
-        // #filePath → .../sprite-editor/Sources/GBSpriteEditor/Models/TileDocument.swift
-        // Walk up to the repo root (4 levels) then into alchemy/res/
+        // #filePath → .../tools/sprite-editor/Sources/GBSpriteEditor/Models/TileDocument.swift
+        // Walk up to the repo root (6 levels), then into the game's res/
         let sourceFile = URL(fileURLWithPath: #filePath)
         let repoRoot = sourceFile
             .deletingLastPathComponent()  // Models/
             .deletingLastPathComponent()  // GBSpriteEditor/
             .deletingLastPathComponent()  // Sources/
             .deletingLastPathComponent()  // sprite-editor/
+            .deletingLastPathComponent()  // tools/
             .deletingLastPathComponent()  // repo root
-        let outDir = repoRoot.appendingPathComponent("alchemy/res").standardized
+        let outDir = repoRoot.appendingPathComponent(defaultGameResPath).standardized
         let fileURL = outDir.appendingPathComponent("tiles.gbtiles")
         return (fileURL, outDir)
     }
@@ -592,7 +597,7 @@ class TileDocument: ObservableObject {
         }
     }
 
-    // MARK: - Default Alchemy Palettes
+    // MARK: - Default palettes (seed for a new document)
 
     static func defaultPalettes() -> [GBPalette] {
         [
@@ -655,7 +660,7 @@ class TileDocument: ObservableObject {
         ]
     }
 
-    // MARK: - Default Alchemy Tiles (pixel data from tiles_data.c)
+    // MARK: - Default tiles (seed for a new document)
 
     static func defaultTiles() -> [GBTile16x16] {
         let tileBytes: [(name: String, palette: Int, data: [UInt8])] = [

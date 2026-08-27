@@ -302,6 +302,7 @@ void rta_play(const rt_engine *e) BANKED
         uint8_t n_sparks = 0;
         uint8_t f;
         uint8_t dirty = 0, ybit = 1;
+        uint8_t sfx_tiers = 0;          /* transmute jingles played (bit = tier-4) */
         const rt_event *ev = e->events;
         const rt_event *end = e->events + e->event_count;
 
@@ -311,7 +312,16 @@ void rta_play(const rt_engine *e) BANKED
             if (ev->type == RT_EV_TRANSMUTE || ev->type == RT_EV_BONUS) {
                 visual[ev->b][ev->a] = ev->c;
                 dirty |= bit_of8[ev->b];
-                if (ev->c >= 4 && ev->c <= 11) {
+                if (ev->c >= 4 && ev->c <= 11 &&
+                    !(sfx_tiers & bit_of8[ev->c - 4])) {
+                    /* one jingle per tier per pass: a jingle is ~19
+                       scanlines of synchronous APU writes and five
+                       transmutes in a pass overran the frame (the
+                       repeats were inaudible anyway — the last one
+                       restarted the same channels). Pump between the
+                       ones that remain. */
+                    if (sfx_tiers) rta_frame_pump();
+                    sfx_tiers |= bit_of8[ev->c - 4];
                     ngau_event(NGAU_EV_TRANSMUTE_BRONZE + (ev->c - 4));
                 }
                 if (n_sparks < 3) {

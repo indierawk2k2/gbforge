@@ -94,6 +94,10 @@ uint8_t flow_resolve(rt_engine *e, const ng_mode_config *cfg,
             if (passes >= 1) {
                 uint8_t c = passes;
                 if (c > 4) c = 4;             /* chain_5 caps */
+                /* a jingle is written to the APU synchronously (up to
+                   ~450 register writes, ~40 scanlines): two of them in
+                   one frame plus the pump overran it */
+                if (e->yield) e->yield();
                 ngau_event(NGAU_EV_CHAIN_2 + (c - 1));
             }
         }

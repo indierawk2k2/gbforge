@@ -19,6 +19,7 @@
 
 /* set by rtv_blast (bank 3), consumed here */
 volatile uint8_t rtv_vbl_armed;
+uint8_t rtv_vbl_installed = 0;      /* rtv_blast_install() has run */
 const uint8_t *rtv_vbl_src_attr;
 const uint8_t *rtv_vbl_src_tile;
 uint16_t rtv_vbl_dst;
@@ -54,6 +55,8 @@ void rtv_blast_now(void)
 
 void rtv_blast_install(void)
 {
+    if (rtv_vbl_installed) return;
     rtv_vbl_armed = 0;
     add_VBL(rtv_blast_vbl);
+    rtv_vbl_installed = 1;
 }

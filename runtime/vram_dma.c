@@ -414,6 +414,7 @@ static void gdma(const uint8_t *src, uint16_t dst, uint8_t blocks)
 }
 
 extern volatile uint8_t rtv_vbl_armed;
+extern uint8_t rtv_vbl_installed;
 extern const uint8_t *rtv_vbl_src_attr, *rtv_vbl_src_tile;
 extern uint16_t rtv_vbl_dst;
 extern uint8_t rtv_vbl_blocks;
@@ -438,9 +439,20 @@ void rtv_blast(void) BANKED
         rtv_blast_now();
         return;
     }
+    rtv_vbl_armed = 1;
+    if (!rtv_vbl_installed) {
+        /* An entry point that never called rtv_blast_install(): land it
+           ourselves right after vsync() instead — a few lines later
+           than the ISR path, still inside vblank for anything but a
+           whole board after a long ISR, and never a wild jump (a
+           smoketest main without the install rebooted on its first
+           swap). */
+        vsync();
+        rtv_blast_now();
+        return;
+    }
     /* land it in the next vblank's ISR (vram_vbl.c), both banks in one
        go at LY ~144; vsync() returns once the handler chain has run */
-    rtv_vbl_armed = 1;
     vsync();
 }
 

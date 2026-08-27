@@ -61,4 +61,12 @@ uint8_t ab_target_ok(const ng_ability *a, const rt_engine *e,
 uint8_t ab_cast(const ng_ability *a, rt_engine *e,
                 uint8_t tx, uint8_t ty) BANKED;
 
+/* cast paying from an external manna pool (battle CPU) */
+uint8_t ab_cast_from(const ng_ability *a, rt_engine *e,
+                     uint8_t tx, uint8_t ty, uint8_t pool[3]) BANKED;
+
+/* first valid target scanning from a pseudo-random start */
+uint8_t ab_find_target(const ng_ability *a, const rt_engine *e,
+                       uint8_t seed, uint8_t *tx, uint8_t *ty) BANKED;
+
 #endif

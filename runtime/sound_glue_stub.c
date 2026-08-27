@@ -9,3 +9,10 @@ void ngau_init(void) {}
 void ngau_event(uint8_t ev) { (void)ev; }
 void ngau_cast(uint8_t sfx_id) { (void)sfx_id; }
 void ngau_scene(uint8_t scene) { (void)scene; }
+
+/* sfx_data2 (editor-owned res) references the CH3 tail fade state
+   owned by the full sound engine; the stub build just hosts it. */
+uint8_t ch3_tail_age;
+uint8_t ch3_shaping;
+uint8_t ch3_freq_lo;
+uint8_t ch3_freq_hi;

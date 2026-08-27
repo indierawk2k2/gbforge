@@ -115,3 +115,48 @@ uint8_t ab_cast(const ng_ability *a, rt_engine *e,
             return 0;
     }
 }
+
+/* Cast with costs drawn from an external pool (the battle CPU's
+ * manna) instead of the engine's: swap the pools around ab_cast so
+ * every op / target rule stays single-sourced. */
+uint8_t ab_cast_from(const ng_ability *a, rt_engine *e,
+                     uint8_t tx, uint8_t ty, uint8_t pool[3]) BANKED
+{
+    uint8_t save[3];
+    uint8_t ok, i;
+    for (i = 0; i < 3; i++) {
+        save[i] = e->manna[i];
+        e->manna[i] = pool[i];
+    }
+    ok = ab_cast(a, e, tx, ty);
+    for (i = 0; i < 3; i++) {
+        pool[i] = e->manna[i];
+        e->manna[i] = save[i];
+    }
+    return ok;
+}
+
+/* First board cell (scanning from a pseudo-random start) that
+ * passes the ability's target filter. Returns 0 if none. */
+uint8_t ab_find_target(const ng_ability *a, const rt_engine *e,
+                       uint8_t seed, uint8_t *tx, uint8_t *ty) BANKED
+{
+    uint8_t i;
+    uint8_t at = (uint8_t)(seed & 63);
+    if (a->targeting == AB_TARGET_NONE) {
+        *tx = 0;
+        *ty = 0;
+        return 1;
+    }
+    for (i = 0; i < 64; i++) {
+        uint8_t x = (uint8_t)(at & 7);
+        uint8_t y = (uint8_t)(at >> 3);
+        if (ab_target_ok(a, e, x, y)) {
+            *tx = x;
+            *ty = y;
+            return 1;
+        }
+        at = (uint8_t)((at + 1) & 63);
+    }
+    return 0;
+}

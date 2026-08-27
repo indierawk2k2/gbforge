@@ -15,7 +15,9 @@
 #include "ui_core.h"
 #include "palettes.h"
 
-extern const rt_fx_spec ng_ability_fx[];
+extern rt_fx_spec ability_fx_live[];   /* boot-copied ROM values;
+                                          the animation editor pokes
+                                          these live */
 extern const ng_overlay *const ng_ability_ovl[];
 
 /* 32-entry sine, -8..8 — scaled by amplitude then >>3 */
@@ -244,7 +246,7 @@ void rtfx_run(const rt_fx_spec *fx) BANKED
 void rtfx_cast(uint8_t idx) BANKED
 {
     const ng_overlay *o = ng_ability_ovl[idx];
-    const rt_fx_spec *fx = &ng_ability_fx[idx];
+    const rt_fx_spec *fx = &ability_fx_live[idx];
     if (fx->kind == RTFX_NONE && !o) return;
     if (o) {
         ui_show_overlay(o);

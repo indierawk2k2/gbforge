@@ -63,4 +63,14 @@ void ui_show_overlay(const ng_overlay *o) BANKED
                       ln->n_tiles, 1, buf);
         base += ln->n_tiles;
     }
+    if (o->has_icon) {
+        uint8_t t = o->icon_tile;
+        uint8_t a = o->icon_pal;
+        uint8_t x = (uint8_t)(o->box.x + 1 + o->icon_dx);
+        uint8_t y = (uint8_t)(o->box.y + o->icon_dy);
+        VBK_REG = VBK_ATTRIBUTES;
+        set_bkg_tiles(x, y, 1, 1, &a);
+        VBK_REG = VBK_TILES;
+        set_bkg_tiles(x, y, 1, 1, &t);
+    }
 }

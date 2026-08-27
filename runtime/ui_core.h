@@ -41,6 +41,11 @@ typedef struct {
     ng_box_style box;
     const ng_overlay_line *lines;
     uint8_t line_count;
+    uint8_t icon_tile;   /* leading tile before line 0 (cast icon) */
+    uint8_t icon_pal;
+    uint8_t icon_dx;     /* interior column */
+    uint8_t icon_dy;     /* interior row (line 0's row)            */
+    uint8_t has_icon;
 } ng_overlay;
 
 /* Draw the box chrome + fill. */

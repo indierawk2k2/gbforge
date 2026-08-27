@@ -21,6 +21,7 @@ FX_WAVE = 3       # a=amplitude px, b=phase speed
 FX_SHEAR = 4      # a=amplitude px, b=split scanline/8 (tile row)
 FX_TINT = 5       # a,b,c = target r,g,b (0-31); ramps in and out
 FX_GRAYFADE = 6   # desaturate toward per-color luma and back
+FX_TRIFADE = 7    # fire/water/earth tint pulses in sequence
 
 
 @dataclass
@@ -54,3 +55,7 @@ class CastFx:
     @classmethod
     def grayfade(cls, frames=48):
         return cls(FX_GRAYFADE, frames)
+
+    @classmethod
+    def trifade(cls, frames=60):
+        return cls(FX_TRIFADE, frames)

@@ -95,6 +95,11 @@ static void fx_raster_frame(uint8_t base_scx, int8_t amp,
     uint8_t prev = 0xFF;
     uint8_t ly;
     vsync();
+    /* vsync() returns INSIDE vblank (LY 144-153) — wait for the
+       wrap to line 0 or the visible-line loop below never runs
+       (aqua/mercury shipped with no visible effect at all) */
+    while (LY_REG >= 144)
+        ;
     /* visible lines only; a missed line just softens the effect */
     while ((ly = LY_REG) < 144) {
         if (ly != prev) {
@@ -184,6 +189,32 @@ void rtfx_run(const rt_fx_spec *fx) BANKED
         for (t = half; t > 0; t--) {
             fx_tint_step(fx->a, fx->b, fx->c,
                          (uint8_t)(((t - 1) << 3) / half));
+        }
+        fx_restore_pal();
+        SHOW_SPRITES;
+        break;
+    }
+
+    case RTFX_TRIFADE: {
+        /* one tint pulse per manna color — fire red, water blue,
+           earth green — then the promotion lands on the reveal */
+        static const uint8_t tri[3][3] = {
+            { 31, 8, 8 }, { 8, 14, 31 }, { 10, 26, 10 },
+        };
+        uint8_t third = (uint8_t)(f / 3);
+        uint8_t half = (uint8_t)(third >> 1);
+        uint8_t c2;
+        if (!half) half = 4;
+        HIDE_SPRITES;
+        for (c2 = 0; c2 < 3; c2++) {
+            for (t = 0; t < half; t++) {
+                fx_tint_step(tri[c2][0], tri[c2][1], tri[c2][2],
+                             (uint8_t)((t << 3) / half));
+            }
+            for (t = half; t > 0; t--) {
+                fx_tint_step(tri[c2][0], tri[c2][1], tri[c2][2],
+                             (uint8_t)(((t - 1) << 3) / half));
+            }
         }
         fx_restore_pal();
         SHOW_SPRITES;

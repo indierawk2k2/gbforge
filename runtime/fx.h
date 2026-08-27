@@ -30,6 +30,7 @@
 #define RTFX_SHEAR     4  /* a=amplitude px, b=split tile row      */
 #define RTFX_TINT      5  /* a,b,c = target r,g,b (5-bit)          */
 #define RTFX_GRAYFADE  6  /* desaturate toward per-color luma      */
+#define RTFX_TRIFADE   7  /* fire/water/earth tint pulses in turn  */
 
 typedef struct {
     uint8_t kind;

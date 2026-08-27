@@ -3,18 +3,28 @@
 A declarative model for tile-based puzzle games that compiles to Game
 Boy Color code at build time.
 
+This repo is two things.
+
+The first is a Game Boy Color abstraction layer for quickly building
+tile-based puzzle games. It has a full validation loop that drives the
+real ROM in a headless build of SameBoy and asserts on both memory and
+pixels; a pattern for integrating human-authored graphics, animation
+and sound; and a runtime tuned against the hardware's timing windows —
+which together compile to a `.gbc` ROM. The spec, the generated output
+and the built ROM are all committed, so the before and after is
+readable without installing a toolchain.
+
+The second is a record of lessons and techniques for running agentic
+coding projects. Every piece of this repo came from asking **what is
+preventing me from moving faster?** That evolution is documented in
+[What was slowing me down](#what-was-slowing-me-down).
+
 You declare the game's presentation and policy — modes and their
 refill/shake rules, every animation timing, the UI overlays, the
 title screen — in about forty lines of Python. gbforge turns that
-into the C configuration tables a shared, hand-tuned runtime
-consumes, and the result links into a ROM that runs on an 8-bit CPU
-with 8KB of work RAM and bank-switched ROM.
-
-It ships with the rest of the workbench: a headless emulator harness
-that drives the ROM at the memory and pixel level, a pure-Python model
-of the game engine that is checked against the C one over ten thousand
-boards, and the macOS art tool that owns the game's tile and palette
-source files directly.
+into the C configuration tables the shared runtime consumes, and the
+result links into a ROM that runs on an 8-bit CPU with 8KB of work RAM
+and bank-switched ROM.
 
 ## Why this exists
 
@@ -26,8 +36,8 @@ a higher-level model would cost at runtime.
 
 That constraint binds at runtime, not at build time. gbforge resolves
 the abstraction while compiling: the model becomes constant tables,
-and the runtime that interprets them is written once, by hand, against
-the hardware's real timing windows. The hardware never pays for the
+and the runtime that interprets them is written once, against the
+hardware's real timing windows. The hardware never pays for the
 expressiveness.
 
 The division of labor is deliberate, so here it is precisely: the
@@ -36,8 +46,27 @@ geometry and the match/gravity/cascade resolution loop live in the
 **shared runtime**; and a thin **per-game C entry point** (337 lines
 in the example) wires input edges, score and move counters, and the
 win/lose ladder to both. A second game costs 44 lines of spec and a
-~340-line loop instead of a 3,500-line engine — and every timing and
+~340-line loop instead of a 3,900-line engine — and every timing and
 layout decision stays declarative and hot-tunable.
+
+This did not start as a framework or a compiler. It started as a game
+with six gameplay modes, each coded individually, many of them sharing
+core mechanics. Claude was not diligent about updating every mode when
+a shared mechanic changed — so I rewrote the core into a higher-level
+abstraction, which had to resolve above the GBC code because the CPU
+cannot afford indirection at runtime.
+
+To trust an agent with an engine rewrite, I first built a Python
+reference implementation, ported line-for-line from the original engine
+and locked to it by a transcript over ten thousand boards — bug for
+bug, deliberately, with the quirks catalogued rather than fixed. The
+last hand-built ROM is archived in the repo as a permanent oracle. The
+cutover came out byte-equivalent, and the differential found three real
+bugs in the original along the way.
+
+That history is why the runtime is tuned against real timing windows
+while the game description model is deceptively thin. And it is why a
+second game costs a spec and a loop rather than an engine.
 
 The reason to do this now is economic. With coding agents doing
 implementation under specification and review, one person can carry a
@@ -106,15 +135,15 @@ Written once. A second game adds nothing to this column.
 
 | Piece | Size | Notes |
 |---|---|---|
-| `runtime/` — engine, animator, VRAM, HUD, title | 3,506 lines of C, 17 files | hand-written against the hardware's timing windows |
-| `gbforge/` — model, codegen, reference sim | 2,309 lines, 22 files | the abstraction and its Python twin |
-| `harness/` — headless emulator, client, scenarios | 2,965 lines | [the verification loop](#the-verification-loop) |
+| `runtime/` — engine, animator, VRAM, HUD, title | 3,856 lines of C, 18 files | source, not generated — tuned against the hardware's timing windows |
+| `gbforge/` — model, codegen, reference sim | 2,370 lines, 23 files | the abstraction and its Python twin |
+| `harness/` — headless emulator, client, scenarios | 3,011 lines | [the verification loop](#the-verification-loop) |
 | `scripts/` — asset generation, bank checker, gates | 2,081 lines | |
-| `tests/` — transcript oracle, contract tests | 482 lines | |
+| `tests/` — transcript oracle, contract tests | 435 lines | |
 | `tools/sprite-editor/` — tile and palette editor | 6,275 lines of Swift | [the art tools](#the-art-tools) |
 | `examples/cascadia/res/` — art, palettes, two font weights | 1,492 lines, 13 files | the editor + `gen_placeholder_res.py` |
 
-Roughly 11,300 lines of runtime, model, harness and gates sit under
+Roughly 11,750 lines of runtime, model, harness and gates sit under
 those 381. The ratio is the argument: the expensive half is paid once,
 and the machine that reads the spec is smaller than the runtime that
 executes it — which is the point, not an apology for it.
@@ -137,7 +166,7 @@ the art is generated placeholder by design.)*
 ```
    spec (Python) → model objects → codegen → C tables ──┐
                                                         │
-   hand-written runtime (engine, animator, UI, VRAM) ───┼──→ GBDK/SDCC → ROM
+   the shared runtime (engine, animator, UI, VRAM) ─────┼──→ GBDK/SDCC → ROM
                                                         │
    res/ (the art tools own these files) ────────────────┘
 ```
@@ -152,7 +181,7 @@ the art is generated placeholder by design.)*
 Two design rules carry most of the weight:
 
 - **Generated code is data, not logic.** The runtime's hot paths are
-  hand-written against the hardware; the model can grow richer without
+  source, not generated output, and are tuned against the hardware; the model can grow richer without
   the ROM getting slower.
 - **Behavior is verified by execution.** Not by reading the diff.
 
@@ -189,7 +218,7 @@ the same pipeline, with each item's arrow position computed from where
 its ink actually starts rather than from the label's box.
 
 The title screen runs on the same machinery with a second, 16×16
-weight of the font — hand-plotted at a 3px stem rather than scaled up,
+weight of the font — drawn at a 3px stem rather than scaled up,
 because doubling an 8px face gives hairline strokes on a big body and
 a monospaced grid. `gen_title` bakes the spec's `logo_text` into a
 two-row run and centres its **ink** — not its advance width, and not
@@ -260,7 +289,88 @@ scans index with single 8-bit variables; and a function whose locals
 pass 127 bytes loses `ldhl sp` addressing for every one of them, so
 the engine's scratch boards are statics.
 
+## What was slowing me down
+
+This history is the parent project's — a complete Game Boy Color game,
+six months and 170 commits, from which this repository was extracted.
+Everything here came out of that.
+
+I have not read a code diff on this project. That is not a principle —
+I read code at the start, and it stopped scaling after a few days. What
+I do instead is validate behaviour after big changes and new features,
+and read verdicts about behaviour after every build. Behaviour here
+means the game's accuracy, performance and feel, driven through an
+emulator by the agent itself. Everything below fell out of hitting a
+new constraint and evolving the workflow around it.
+
+**1 · Rules baked into the repo, first.** Table stakes: `CLAUDE.md`,
+tooling and test infrastructure, and two workflows — one that runs the
+unit tests and rebuilds the ROM on a clean machine on every push, one
+that publishes a playable ROM on a tag. All of it is in the first
+commit, February 27th, not retrofitted later. From that commit, *does
+this still build from nothing* was a question a machine answered.
+
+None of it was typed by me — not the runtime, not the harness, not the
+editors, and not the game this was extracted from. The distinction that
+matters here isn't who typed a line. It's whether the line is
+regenerated from a source of truth or is itself the source of truth.
+
+**2 · An unverified rule does nothing.** A rule in `CLAUDE.md` or
+`AGENTS.md` is not binding. Models make mistakes, and what closes the
+gap is verification, not more rule text. So: reproduce the problem in
+the emulator and capture it — visually and in memory — then write the
+check that FAILS on the current build, then fix it, then watch the
+check flip. Writing the test last is how you end up with a green suite
+and the bug still there; I have done that, and it is why the order is
+written down. This is [the verification
+loop](#the-verification-loop).
+
+**3 · One change at a time.** With verification in place I could accept
+work faster than I could schedule it, so I tried running several agents
+at once against the backlog. Everything ran through the main game loop,
+so they stamped on each other even in separate git worktrees. After
+three days I moved back to serial, and stayed there for five months.
+
+**4 · An abstraction layer is what actually enables parallelism.** No
+matter how the agents were scheduled they kept colliding, because the
+problem was not scheduling. The fix was architectural: separate the
+game spec from the game runtime so there are natural boundaries to work
+inside. That is [Built by
+agents](#built-by-agents-working-in-parallel), and it is the resolution
+of a problem I first hit in March. Once it was done the rewrite itself
+went quickly — five days from the first harness commit to retiring the
+hand-built engine, in eleven milestones with an equivalence gate on
+each.
+
+**5 · Creative taste needs a human in the loop.** In my testing, models
+still cannot produce pixel art or chiptune audio I would ship. And even
+once they can, a model's taste will not be mine. So I pointed the
+agents at building a toolset for graphics, animation and sound instead.
+The graphics tool is in this repo — see [The art
+tools](#the-art-tools).
+
+### What this does not catch
+
+Differential testing sees divergence from a reference. A capability
+that was never wired up in *either* version is not a divergence, and
+the suite stays green through it — which is how this repository shipped
+a frame hook that nothing ever called, found by playing the ROM rather
+than by any check.
+
+### What is slowing me down now
+
+Two things. The first is budget and session length: long autonomous
+runs get interrupted, and re-establishing context costs more than the
+work it was in the middle of.
+
+The second follows from point 5. Art editing, sound design and music
+have become the bottleneck, and that does not bother me — the human
+creativity is what makes retro games memorable in the first place.
+
 ## Built by agents, working in parallel
+
+> This is [constraint 4](#what-was-slowing-me-down): the architecture
+> exists so that two changes stop landing in the same file.
 
 This codebase is a monorepo whose parts all reach the same main loop.
 That normally serializes work: two people, or two agents, editing a
@@ -320,6 +430,9 @@ notice. That is the argument for the next two sections.
 
 ## The verification loop
 
+> This is [constraint 2](#what-was-slowing-me-down): the machinery that
+> replaced reading the diff.
+
 `harness/gbctl` links SameBoy's emulator core into a headless binary
 that speaks one line protocol ([PROTOCOL.md](harness/PROTOCOL.md)) over
 stdin/stdout. Emulation is **parked** — it advances only when a command
@@ -378,12 +491,33 @@ about a fixture.
 
 ## The art tools
 
-`tools/sprite-editor/` is a SwiftUI macOS app for drawing the game's
-16×16 tiles and editing its palettes. Its document *is*
-`examples/cascadia/res/tiles_data.c` and `res/palettes.c`: it parses
-them on open and rewrites them on save, and the build compiles exactly
-what was saved. There is no export step to forget and no second copy
-to drift.
+> This is [constraint 5](#what-was-slowing-me-down): the one thing that
+> would not delegate.
+
+The placeholder art in this repo was procedurally generated. That is
+the limit of what can be done without human taste. Round-tripping vague
+instructions through a model is a terrible interface for image, sound
+and animation editing — so the coding agents built tooling instead of
+creative output.
+
+`tools/sprite-editor/` is the result: a SwiftUI macOS app whose
+document *is* `examples/cascadia/res/tiles_data.c` and
+`res/palettes.c`. It parses them on open and rewrites them on save, and
+the build compiles exactly what was saved. There is no export step to
+forget and no second copy to drift.
+
+Writing a bespoke editor used to be an irrational use of resources —
+months of work to beat a general tool at one workflow. Coding agents
+changed that calculation. A tool crafted exactly to one pipeline beats
+a general tool plus the glue holding it on, and this is one of three
+built the same way.
+
+In August I tested whether a current model could automate mapping
+artwork onto the Game Boy Color's palette limits. It invented a
+technique that gets more colour on screen than the standard eight
+palettes allow — and the output still did not look as good as the art I
+had hand-tuned. So the technique went into the graphics tool instead,
+as another mode for hand-tuning to work in.
 
 ```bash
 cd tools/sprite-editor && ./build-app.sh && open GBSpriteEditor.app
@@ -441,7 +575,7 @@ gbforge is extracted from a larger private project — a complete
 commercial-shape GBC game whose entire mode set (endless, puzzle,
 timed, battle with a CPU opponent, a quest campaign with dialogue, a
 store, battery saves) runs on this runtime, byte-for-byte equivalent to
-the hand-written implementation it replaced. That game and its assets
+the direct implementation it replaced. That game and its assets
 are not part of this repository; the example art is generated
 placeholder by design.
 

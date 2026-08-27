@@ -151,6 +151,13 @@ static uint8_t do_swap(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2)
 
     processing_matches = 1;
     passes = flow_swap(&eng, &ng_modes[0], x1, y1, x2, y2, refill_tile);
+    if (!passes) {
+        /* reverted: the bracket rode the piece back, so the logical
+           cursor goes back too — BEFORE anything below can pump a
+           frame, or it glides to the target cell and back again */
+        cursor_x = x1;
+        cursor_y = y1;
+    }
     sync_state();
     processing_matches = 0;
     if (!passes) return 0;              /* reverted: move not spent */
@@ -194,6 +201,16 @@ static void classic_frame_hook(void)
     rtc_draw(frame_counter, tile_selected ? 1 : 0);
 }
 
+/* rt_engine.yield: the engine's resolve phases (find, process,
+   gravity, refill, the legal-move scans) call this between chunks of
+   work so no frame goes by without the pump above. HOME-resident on
+   purpose — the engine (bank 1) and flow (bank 2) call it through a
+   plain pointer. */
+static void engine_pump(void)
+{
+    rta_frame_pump();
+}
+
 static void classic_run(void)
 {
     uint8_t keys, pressed;
@@ -223,6 +240,7 @@ static void classic_run(void)
     rtc_snap(cursor_x, cursor_y);
     rtc_invalidate();
     rta_set_frame_hook(classic_frame_hook);
+    eng.yield = engine_pump;
     prev_keys = joypad();
 
     while (1) {
@@ -299,6 +317,8 @@ static void classic_run(void)
 
 void main(void)
 {
+    rtv_blast_install();   /* board DMA in the VBlank ISR; first in the
+                              handler chain (before any sound driver) */
     rta_init(eng.board);
     cpu_fast();
 

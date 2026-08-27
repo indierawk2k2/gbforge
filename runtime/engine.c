@@ -101,52 +101,74 @@ static void award(rt_engine *e, uint8_t tile, uint8_t run, uint8_t pos)
 
 /* ── find ──────────────────────────────────────────── */
 
+#define RT_YIELD(e) do { if ((e)->yield) (e)->yield(); } while (0)
+
 uint8_t rt_find(rt_engine *e) BANKED
 {
+    /* Row / column pointers throughout: SDCC turned every
+       e->board[y][x] into ~100 cycles of 16-bit index math, which made
+       this scan ~124 scanlines and the whole per-pass resolve ~4
+       frames of frozen cursor (bead GameBoyGames-7py). Same visit
+       order and results as before. */
     uint8_t x, y, type, run, i;
     uint8_t found = 0;
 
     memset(e->matched, 0, sizeof(e->matched));
     e->last_max_run = 0;
 
+    /* Single 8-bit indices only: an expression like `x + run < RT_W`
+       or `row[x + run]` is promoted to a signed int by C and SDCC
+       spends ~50 instructions per compare on it. */
     for (y = 0; y < RT_H; y++) {
+        const uint8_t *row = e->board[y];
+        uint8_t *mrow = e->matched[y];
         x = 0;
         while (x < RT_W) {
-            type = e->board[y][x];
+            type = row[x];
             if (type == RT_EMPTY) { x++; continue; }
-            run = 1;
-            while (x + run < RT_W && e->board[y][x + run] == type) run++;
+            i = x; i++;
+            while (i < RT_W && row[i] == type) i++;
+            run = i; run -= x;
             if (run >= 3) {
-                for (i = 0; i < run; i++) e->matched[y][x + i] = 1;
+                uint8_t j = x;
+                for (; j < i; j++) mrow[j] = 1;
                 found = 1;
                 if (run > e->last_max_run) e->last_max_run = run;
             }
-            x += run;
+            x = i;
         }
     }
 
+    RT_YIELD(e);   /* horizontal scan ~50 scanlines; vertical follows */
     for (x = 0; x < RT_W; x++) {
+        const uint8_t *col = &e->board[0][x];      /* stride RT_W */
+        uint8_t *mcol = &e->matched[0][x];
+        uint8_t idx = 0;                            /* y * RT_W */
         y = 0;
         while (y < RT_H) {
-            type = e->board[y][x];
-            if (type == RT_EMPTY) { y++; continue; }
-            run = 1;
-            while (y + run < RT_H && e->board[y + run][x] == type) run++;
+            uint8_t j, jdx;
+            type = col[idx];
+            if (type == RT_EMPTY) { y++; idx += RT_W; continue; }
+            j = y; j++; jdx = idx; jdx += RT_W;
+            while (j < RT_H && col[jdx] == type) { j++; jdx += RT_W; }
+            run = j; run -= y;
             if (run >= 3) {
-                for (i = 0; i < run; i++) e->matched[y + i][x] = 1;
+                uint8_t k = idx;
+                for (; k < jdx; k += RT_W) mcol[k] = 1;
                 found = 1;
                 if (run > e->last_max_run) e->last_max_run = run;
             }
-            y += run;
+            y = j; idx = jdx;
         }
     }
 
     if (found) {
         uint8_t counts[RT_TILE_TYPES];
+        const uint8_t *b = &e->board[0][0];
+        const uint8_t *m = &e->matched[0][0];
         memset(counts, 0, sizeof(counts));
-        for (y = 0; y < RT_H; y++)
-            for (x = 0; x < RT_W; x++)
-                if (e->matched[y][x]) counts[e->board[y][x]]++;
+        for (i = 0; i < RT_H * RT_W; i++)
+            if (m[i]) counts[b[i]]++;
         for (type = 1; type < RT_TILE_TYPES; type++)
             if (counts[type] > e->last_max_run)
                 e->last_max_run = counts[type];
@@ -156,10 +178,11 @@ uint8_t rt_find(rt_engine *e) BANKED
 
 uint8_t rt_dirty_rows(const rt_engine *e) BANKED
 {
-    uint8_t x, y, dirty = 0;
-    for (y = 0; y < RT_H; y++) {
-        for (x = 0; x < RT_W; x++) {
-            if (e->matched[y][x]) { dirty |= (uint8_t)(1 << y); break; }
+    uint8_t x, y, dirty = 0, ybit = 1;
+    const uint8_t *m = &e->matched[0][0];
+    for (y = 0; y < RT_H; y++, ybit <<= 1) {
+        for (x = 0; x < RT_W; x++, m++) {
+            if (*m) { dirty |= ybit; m += (uint8_t)(RT_W - x); break; }
         }
     }
     return dirty;
@@ -167,18 +190,32 @@ uint8_t rt_dirty_rows(const rt_engine *e) BANKED
 
 /* ── process ───────────────────────────────────────── */
 
+/* Scratch arrays live in static storage: as stack locals they pushed
+   these frames past 127 bytes, after which SDCC can no longer address
+   locals with `ldhl sp,#n` and every access costs a 16-bit add — the
+   per-pass resolve was ~4 frames (bead GameBoyGames-7py). The engine
+   is not reentrant, so statics are equivalent. */
+static uint8_t fm_awarded[RT_H][RT_W];
+static uint8_t fm_stack_x[RT_H * RT_W], fm_stack_y[RT_H * RT_W];
+static uint8_t rp_saved[RT_H][RT_W];
+static uint8_t cb_cand_x[RT_H * RT_W], cb_cand_y[RT_H * RT_W];
+
 static void flood_manna(rt_engine *e, const uint8_t saved[RT_H][RT_W])
 {
-    uint8_t awarded[RT_H][RT_W];
-    uint8_t stack_x[RT_H * RT_W], stack_y[RT_H * RT_W];
+#define awarded fm_awarded
+#define stack_x fm_stack_x
+#define stack_y fm_stack_y
     uint8_t sx, sy, x, y, type, sp, count, sum_x, sum_y;
 
     memset(awarded, 0, sizeof(awarded));
 
     for (sy = 0; sy < RT_H; sy++) {
+        const uint8_t *mrow = e->matched[sy];
+        const uint8_t *arow = awarded[sy];
+        const uint8_t *srow = saved[sy];
         for (sx = 0; sx < RT_W; sx++) {
-            if (!e->matched[sy][sx] || awarded[sy][sx]) continue;
-            type = saved[sy][sx];
+            if (!mrow[sx] || arow[sx]) continue;
+            type = srow[sx];
             if (type < RT_MANNA_FIRST || type > RT_MANNA_LAST) continue;
 
             sp = 0;
@@ -212,12 +249,16 @@ static void flood_manna(rt_engine *e, const uint8_t saved[RT_H][RT_W])
             }
         }
     }
+#undef awarded
+#undef stack_x
+#undef stack_y
 }
 
 static void try_4chain_bonus(rt_engine *e, uint8_t metal_type)
 {
     uint8_t next = rt_next_tier(e, metal_type);
-    uint8_t cand_x[RT_H * RT_W], cand_y[RT_H * RT_W];
+#define cand_x cb_cand_x
+#define cand_y cb_cand_y
     uint8_t n = 0, x, y, pick;
 
     if (next == RT_EMPTY) return;
@@ -235,6 +276,8 @@ static void try_4chain_bonus(rt_engine *e, uint8_t metal_type)
     pick = e->rng(n);
     e->board[cand_y[pick]][cand_x[pick]] = next;
     emit(e, RT_EV_BONUS, cand_x[pick], cand_y[pick], next);
+#undef cand_x
+#undef cand_y
 }
 
 static void metal_run(rt_engine *e, uint8_t type, uint8_t run,
@@ -265,68 +308,86 @@ static void metal_run(rt_engine *e, uint8_t type, uint8_t run,
 
 uint8_t rt_process(rt_engine *e) BANKED
 {
-    uint8_t saved[RT_H][RT_W];
+#define saved rp_saved
     uint8_t x, y, type, run;
     uint8_t count = 0;
 
     memcpy(saved, e->board, sizeof(saved));
 
     emit(e, RT_EV_PASS_BEGIN, e->last_max_run, rt_dirty_rows(e), 0);
-    for (y = 0; y < RT_H; y++) {
-        uint8_t mask = 0;
-        for (x = 0; x < RT_W; x++)
-            if (e->matched[y][x]) mask |= (uint8_t)(1 << x);
-        if (mask) emit(e, RT_EV_MATCH_ROW, y, mask, 0);
+    {
+        const uint8_t *m = &e->matched[0][0];
+        for (y = 0; y < RT_H; y++) {
+            uint8_t mask = 0, xbit = 1;
+            for (x = 0; x < RT_W; x++, xbit <<= 1, m++)
+                if (*m) mask |= xbit;
+            if (mask) emit(e, RT_EV_MATCH_ROW, y, mask, 0);
+        }
     }
 
-    for (y = 0; y < RT_H; y++)
-        for (x = 0; x < RT_W; x++)
-            if (e->matched[y][x]) {
-                uint8_t k = e->board[y][x];
-                e->board[y][x] = RT_EMPTY;
+    {
+        const uint8_t *m = &e->matched[0][0];
+        uint8_t *b = &e->board[0][0];
+        uint8_t i;
+        for (i = 0; i < RT_H * RT_W; i++, m++, b++)
+            if (*m) {
+                uint8_t k = *b;
+                *b = RT_EMPTY;
                 e->cleared_total++;   /* lifetime clear count */
                 if (e->cleared_by_kind[k] != 255)
                     e->cleared_by_kind[k]++;
             }
+    }
 
+    RT_YIELD(e);
     flood_manna(e, saved);
+    RT_YIELD(e);
 
     for (y = 0; y < RT_H; y++) {
+        const uint8_t *mrow = e->matched[y];
+        const uint8_t *srow = saved[y];
         x = 0;
         while (x < RT_W) {
-            if (!e->matched[y][x]) { x++; continue; }
-            type = saved[y][x];
-            run = 0;
-            while (x + run < RT_W && e->matched[y][x + run] &&
-                   saved[y][x + run] == type) run++;
+            uint8_t i;
+            if (!mrow[x]) { x++; continue; }
+            type = srow[x];
+            i = x;
+            while (i < RT_W && mrow[i] && srow[i] == type) i++;
+            run = i; run -= x;
             if (run >= 3) {
                 if (type >= RT_METAL_FIRST && type <= RT_METAL_LAST)
                     metal_run(e, type, run, x, y, 1);
                 count++;
             }
-            x += run;
+            x = i;
         }
     }
 
+    RT_YIELD(e);
     for (x = 0; x < RT_W; x++) {
+        const uint8_t *mcol = &e->matched[0][x];   /* stride RT_W */
+        const uint8_t *scol = &saved[0][x];
+        uint8_t idx = 0;
         y = 0;
         while (y < RT_H) {
-            if (!e->matched[y][x]) { y++; continue; }
-            type = saved[y][x];
-            run = 0;
-            while (y + run < RT_H && e->matched[y + run][x] &&
-                   saved[y + run][x] == type) run++;
+            uint8_t j, jdx;
+            if (!mcol[idx]) { y++; idx += RT_W; continue; }
+            type = scol[idx];
+            j = y; jdx = idx;
+            while (j < RT_H && mcol[jdx] && scol[jdx] == type) { j++; jdx += RT_W; }
+            run = j; run -= y;
             if (run >= 3) {
                 if (type >= RT_METAL_FIRST && type <= RT_METAL_LAST)
                     metal_run(e, type, run, x, y, 0);
                 count++;
             }
-            y += run;
+            y = j; idx = jdx;
         }
     }
 
     emit(e, RT_EV_PASS_END, count, 0, 0);
     return count;
+#undef saved
 }
 
 /* ── gravity / refill ──────────────────────────────── */
@@ -336,13 +397,16 @@ uint8_t rt_gravity(rt_engine *e) BANKED
     uint8_t x, y, write_y;
     uint8_t moved = 0;
     for (x = 0; x < RT_W; x++) {
+        uint8_t *col = &e->board[0][x];            /* stride RT_W */
         write_y = RT_H - 1;
         for (y = RT_H; y > 0; ) {
+            uint8_t t;
             y--;
-            if (e->board[y][x] != RT_EMPTY) {
+            t = col[(uint8_t)(y << 3)];
+            if (t != RT_EMPTY) {
                 if (y != write_y) {
-                    e->board[write_y][x] = e->board[y][x];
-                    e->board[y][x] = RT_EMPTY;
+                    col[(uint8_t)(write_y << 3)] = t;
+                    col[(uint8_t)(y << 3)] = RT_EMPTY;
                     emit(e, RT_EV_FALL, x, y, write_y);
                     moved = 1;
                 }
@@ -386,22 +450,25 @@ uint8_t rt_resolve_pass(rt_engine *e) BANKED
 
 static uint8_t check_match_at(rt_engine *e, uint8_t x, uint8_t y)
 {
-    uint8_t type = e->board[y][x];
-    uint8_t count, i;
+    const uint8_t *row = e->board[y];
+    const uint8_t *col = &e->board[0][x];      /* stride RT_W */
+    uint8_t type = row[x];
+    uint8_t count, i, idx, yidx;
     if (type == RT_EMPTY) return 0;
 
     count = 1;
     i = x;
-    while (i > 0 && e->board[y][i - 1] == type) { count++; i--; }
+    while (i > 0 && row[i - 1] == type) { count++; i--; }
     i = x;
-    while (i < RT_W - 1 && e->board[y][i + 1] == type) { count++; i++; }
+    while (i < RT_W - 1 && row[i + 1] == type) { count++; i++; }
     if (count >= 3) return 1;
 
     count = 1;
-    i = y;
-    while (i > 0 && e->board[i - 1][x] == type) { count++; i--; }
-    i = y;
-    while (i < RT_H - 1 && e->board[i + 1][x] == type) { count++; i++; }
+    yidx = (uint8_t)(y << 3);
+    i = y; idx = yidx;
+    while (i > 0 && col[idx - RT_W] == type) { count++; i--; idx -= RT_W; }
+    i = y; idx = yidx;
+    while (i < RT_H - 1 && col[idx + RT_W] == type) { count++; i++; idx += RT_W; }
     return count >= 3;
 }
 
@@ -491,6 +558,9 @@ uint8_t rt_count_moves(const rt_engine *e) BANKED
     rt_engine *w = (rt_engine *)e;   /* swap-and-restore, net zero */
 
     for (y = 0; y < RT_H; y++) {
+        /* the exhaustive count ran ~3.5 frames after every cascade
+           (the endless "MV" counter): pump every other row */
+        if (y & 1) RT_YIELD(w);
         for (x = 0; x < RT_W; x++) {
             if (w->board[y][x] == RT_EMPTY) continue;
             if (x < RT_W - 1 && w->board[y][x + 1] != RT_EMPTY) {
@@ -522,6 +592,7 @@ uint8_t rt_has_legal_moves(rt_engine *e) BANKED
 {
     uint8_t x, y, tmp, hit;
     for (y = 0; y < RT_H; y++) {
+        if (y & 2) RT_YIELD(e);    /* ~0.45 frame per row under SDCC */
         for (x = 0; x < RT_W; x++) {
             if (x < RT_W - 1) {
                 tmp = e->board[y][x];

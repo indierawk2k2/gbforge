@@ -42,7 +42,11 @@ void rtv_blit_board(const uint8_t board[8][8]) BANKED;
 void rtv_stage_reset(void) BANKED;
 void rtv_stage_row(uint8_t board_row,
                    const uint8_t attr[32], const uint8_t tile[32]) BANKED;
-void rtv_blast(void) BANKED;
+void rtv_blast(void) BANKED;   /* arms the VBlank DMA and waits for it (LCD off: immediate) */
+
+/* The blast lands in the VBlank ISR (vram_vbl.c, HOME). Install once
+ * at boot BEFORE the sound driver so it runs first in the chain. */
+void rtv_blast_install(void);
 
 /* Stage one board row rendered normally from `board`. */
 void rtv_stage_board_row(const uint8_t board[8][8], uint8_t y) BANKED;

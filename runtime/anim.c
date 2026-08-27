@@ -154,16 +154,33 @@ void rta_set_frame_hook(void (*fn)(void)) BANKED
 
 #define FRAME_HOOK() do { if (frame_hook) frame_hook(); } while (0)
 
+/* One animation frame's worth of the non-blocking systems (shake,
+   "+N" floats). Every site that does its own vsync()+blast must call
+   this too — the fall and refill loops used to skip it, so a manna
+   float spawned over the falling column froze on every half/full-step
+   frame and lived ~47 frames instead of 24 (bead GameBoyGames-3at). */
+static void frame_tick(void)
+{
+    rta_apply_shake();
+    rta_update_floats();
+}
+
 static void wait_frames(uint8_t n)
 {
     /* every blocking wait pumps the non-blocking systems, like the
        legacy render_delay_with_cursor frame pump */
     while (n--) {
         vsync();
-        rta_apply_shake();
-        rta_update_floats();
+        frame_tick();
         FRAME_HOOK();
     }
+}
+
+void rta_frame_pump(void) BANKED
+{
+    vsync();
+    frame_tick();
+    FRAME_HOOK();
 }
 
 void rta_init(const uint8_t board[8][8]) BANKED
@@ -181,43 +198,92 @@ void rta_sync(const uint8_t board[8][8]) BANKED
 
 /* Flash matched cells: attributes only (sprite-free, per the legacy
  * interlace fix) — all four quadrants to PAL_SILVER. */
+/* set by rta_flash_early: the flash is already on screen and landed
+   at sys_time == flash_t0 (GBDK's VBL frame counter) */
+static uint8_t flash_early;
+static uint16_t flash_t0;
+
 static void flash_matched(const uint8_t row_masks[8])
 {
-    uint8_t silver[2] = {PAL_SILVER, PAL_SILVER};
     uint8_t x, y;
 
-    VBK_REG = VBK_ATTRIBUTES;
+    if (flash_early) {
+        /* already showing: pump until flash_hold frames have passed
+           since it landed (the engine work ran under it) */
+        flash_early = 0;
+        while ((uint16_t)(sys_time - flash_t0) < RTA_PARAMS->flash_hold)
+            wait_frames(1);
+        return;
+    }
+
+    /* staged + vblank-blasted like every other board update (direct
+       attr writes landed wherever the beam was). Rows are staged by
+       the fast row primitive and only the matched cells get their
+       attrs painted silver: the per-cell C loop here cost ~27
+       scanlines per row (bead GameBoyGames-374). */
+    rtv_stage_reset();
     for (y = 0; y < 8; y++) {
         uint8_t mask = row_masks[y];
+        uint8_t xbit = 1;
         if (!mask) continue;
-        for (x = 0; x < 8; x++) {
-            if (mask & (uint8_t)(1 << x)) {
-                uint8_t tx = BOARD_OFFSET + (x << 1);
-                uint8_t ty = BOARD_OFFSET + (y << 1);
-                set_bkg_tiles(tx, ty, 2, 1, silver);
-                set_bkg_tiles(tx, ty + 1, 2, 1, silver);
-            }
-        }
+        rtv_stage_board_row(visual, y);
+        for (x = 0; x < 8; x++, xbit <<= 1)
+            if (mask & xbit) rtv_stage_cell_attr(x, y, PAL_SILVER);
     }
-    VBK_REG = VBK_TILES;
+    rtv_blast();
+    frame_tick();
     wait_frames(RTA_PARAMS->flash_hold);
 }
+
+void rta_flash_early(const uint8_t matched[8][8]) BANKED
+{
+    uint8_t masks[8];
+    uint8_t x, y;
+    for (y = 0; y < 8; y++) {
+        const uint8_t *m = matched[y];
+        uint8_t mask = 0, xbit = 1;
+        for (x = 0; x < 8; x++, xbit <<= 1)
+            if (m[x]) mask |= xbit;
+        masks[y] = mask;
+    }
+    flash_early = 0;
+    rtv_stage_reset();
+    for (y = 0; y < 8; y++) {
+        uint8_t mask = masks[y];
+        uint8_t xbit = 1;
+        if (!mask) continue;
+        rtv_stage_board_row(visual, y);
+        for (x = 0; x < 8; x++, xbit <<= 1)
+            if (mask & xbit) rtv_stage_cell_attr(x, y, PAL_SILVER);
+    }
+    rtv_blast();
+    frame_tick();
+    FRAME_HOOK();
+    flash_t0 = sys_time;
+    flash_early = 1;
+}
+
+/* rta_play's own frame is large (event buffers); keep the fall list
+   out of it so SDCC can address the hot loops directly. */
+static struct { uint8_t x, cur, to, tile; } falls[64];
+static uint8_t rf_empty[8];    /* refill: ghosts per column */
+static const uint8_t bit_of8[8] = {1, 2, 4, 8, 16, 32, 64, 128};
 
 void rta_play(const rt_engine *e) BANKED
 {
     uint8_t row_masks[8];
-    struct { uint8_t x, cur, to, tile; } falls[64];
     uint8_t n_falls = 0;
     uint8_t i, x, y, step;
 
     memset(row_masks, 0, sizeof(row_masks));
 
-    /* First sweep: collect masks / apply clears+transmutes lazily */
-    for (i = 0; i < e->event_count; i++) {
-        const rt_event *ev = &e->events[i];
-        if (ev->type == RT_EV_MATCH_ROW) {
-            row_masks[ev->a] = ev->b;
-        }
+    /* First sweep: collect masks (pointer-walked: indexing
+       e->events[i] cost ~40 scanlines per pass over the buffer) */
+    {
+        const rt_event *ev = e->events;
+        const rt_event *end = e->events + e->event_count;
+        for (; ev < end; ev++)
+            if (ev->type == RT_EV_MATCH_ROW) row_masks[ev->a] = ev->b;
     }
     /* 1) flash the matched cells, hold */
     flash_matched(row_masks);
@@ -226,18 +292,25 @@ void rta_play(const rt_engine *e) BANKED
        spawn +N floats at the flood centroids, blit */
     for (y = 0; y < 8; y++) {
         uint8_t mask = row_masks[y];
-        for (x = 0; x < 8; x++)
-            if (mask & (uint8_t)(1 << x)) visual[y][x] = RT_EMPTY;
+        uint8_t xbit = 1;
+        if (!mask) continue;
+        for (x = 0; x < 8; x++, xbit <<= 1)
+            if (mask & xbit) visual[y][x] = RT_EMPTY;
     }
     {
         uint8_t spark_x[3], spark_y[3];
         uint8_t n_sparks = 0;
         uint8_t f;
+        uint8_t dirty = 0, ybit = 1;
+        const rt_event *ev = e->events;
+        const rt_event *end = e->events + e->event_count;
 
-        for (i = 0; i < e->event_count; i++) {
-            const rt_event *ev = &e->events[i];
+        for (y = 0; y < 8; y++, ybit <<= 1)
+            if (row_masks[y]) dirty |= ybit;
+        for (; ev < end; ev++) {
             if (ev->type == RT_EV_TRANSMUTE || ev->type == RT_EV_BONUS) {
                 visual[ev->b][ev->a] = ev->c;
+                dirty |= bit_of8[ev->b];
                 if (ev->c >= 4 && ev->c <= 11) {
                     ngau_event(NGAU_EV_TRANSMUTE_BRONZE + (ev->c - 4));
                 }
@@ -256,17 +329,29 @@ void rta_play(const rt_engine *e) BANKED
                 spawn_float(ev->c >> 4, ev->c & 0x0F, kp);
             }
         }
-        vsync();
-        rtv_blit_board(visual);
+        /* the cleared/transmuted rows + the sparkle cells hidden, in
+           ONE vblank blast. Only rows that changed are restaged
+           (matched rows, plus the rows of transmute / bonus cells): a
+           full 8-row restage cost ~100 scanlines and a vblank. */
+        /* the sweep above (transmute SFX at ~19 scanlines each, float
+           spawns) plus the staging overran the frame on multi-
+           transmute passes: pump once before staging */
+        rta_frame_pump();
+        rtv_stage_reset();
+        ybit = 1;
+        for (y = 0; y < 8; y++, ybit <<= 1)
+            if (dirty & ybit) rtv_stage_board_row(visual, y);
+        for (i = 0; i < n_sparks; i++) {
+            rtv_stage_tile(spark_x[i], spark_y[i], RT_EMPTY);
+            set_sprite_prop(BURST_SPRITE_BASE + i, 0);
+        }
+        rtv_blast();
+        frame_tick();
         FRAME_HOOK();
 
         /* 2b) transmute sparkle: hide the new tiles behind a 3-phase
            sprite burst (dot → small → full), then reveal */
         if (n_sparks) {
-            for (i = 0; i < n_sparks; i++) {
-                rtv_blit_tile(spark_x[i], spark_y[i], RT_EMPTY);
-                set_sprite_prop(BURST_SPRITE_BASE + i, 0);
-            }
             for (f = 0; f < 3; f++) {
                 for (i = 0; i < n_sparks; i++) {
                     set_sprite_tile(BURST_SPRITE_BASE + i,
@@ -277,20 +362,34 @@ void rta_play(const rt_engine *e) BANKED
                 }
                 wait_frames(RTA_PARAMS->sparkle_frames);
             }
+            rtv_stage_reset();
             for (i = 0; i < n_sparks; i++) {
                 move_sprite(BURST_SPRITE_BASE + i, 0, 0);
-                rtv_blit_tile(spark_x[i], spark_y[i],
-                              visual[spark_y[i]][spark_x[i]]);
+                rtv_stage_tile(spark_x[i], spark_y[i],
+                               visual[spark_y[i]][spark_x[i]]);
             }
+            rtv_blast();
+            frame_tick();
         }
     }
     wait_frames(RTA_PARAMS->clear_hold);
 
     /* 3) falls: step every falling tile down one cell per step,
        delay per the acceleration curve */
-    for (i = 0; i < e->event_count; i++) {
-        const rt_event *ev = &e->events[i];
-        if (ev->type == RT_EV_FALL && n_falls < 64) {
+    /* FALL events sit between the process events and the trailing
+       REFILL events (flow: process -> gravity -> refill), so walk the
+       buffer backwards and stop at the first non-fall: O(falls), not
+       O(events) — the forward scan alone cost ~40 scanlines. */
+    {
+        const rt_event *end = e->events + e->event_count;
+        const rt_event *ev;
+        while (end > e->events && (end - 1)->type == RT_EV_REFILL) end--;
+        ev = end;
+        while (ev > e->events && (ev - 1)->type == RT_EV_FALL) ev--;
+        /* collect FORWARD: emission order is per-column bottom-up, and
+           the move loop below relies on it (a faller stepping into the
+           cell below must not overwrite one that has not moved yet) */
+        for (; ev < end && n_falls < 64; ev++) {
             falls[n_falls].x = ev->a;
             falls[n_falls].cur = ev->b;
             falls[n_falls].to = ev->c;
@@ -306,74 +405,38 @@ void rta_play(const rt_engine *e) BANKED
        the full frame lands it. Staged + blasted, tear-free. */
     step = 0;
     while (1) {
-        uint8_t fall_mask[8];
-        uint8_t dirty = 0;
+        uint8_t col_mask[8];
         uint8_t any = 0;
-
-        memset(fall_mask, 0, sizeof(fall_mask));
+        memset(col_mask, 0, sizeof(col_mask));
         for (i = 0; i < n_falls; i++) {
             if (falls[i].cur < falls[i].to) {
-                fall_mask[falls[i].cur] |= (uint8_t)(1 << falls[i].x);
-                dirty |= (uint8_t)(1 << falls[i].cur);
-                dirty |= (uint8_t)(1 << (falls[i].cur + 1));
+                col_mask[falls[i].x] |= bit_of8[falls[i].cur];
                 any = 1;
             }
         }
         if (!any) break;
-        FRAME_HOOK();
-        /* HALF-STEP: stage dirty rows with split tiles */
+        /* (no FRAME_HOOK here: the pump already ran after the previous
+           blast / wait frame — a second cursor draw in the same frame
+           cost up to ~40 scanlines and, with 30+ fallers, the vblank) */
+        /* HALF-STEP: every moving cell's hw rows slide down one row in
+           the shadow (rtv_shift_column, one call per column); the
+           vacated top row becomes the empty tile's top half. Each hw
+           row keeps its own tile's palette — the legacy "unify palettes
+           vertically" copy painted every faller's top half in the
+           palette of the tile above it (the half-piece flicker). */
         rtv_stage_reset();
-        for (y = 0; y < 8; y++) {
-            uint8_t attr[32], tile[32];
-            if (!(dirty & (uint8_t)(1 << y))) continue;
-            for (x = 0; x < 8; x++) {
-                uint8_t xbit = (uint8_t)(1 << x);
-                uint8_t t, base;
-                /* top hw-row of cell (x, y) */
-                if (y > 0 && (fall_mask[y - 1] & xbit)) {
-                    t = visual[y - 1][x];        /* faller's bottom half */
-                    base = HW_TILE_BASE(t);
-                    tile[(x << 1)] = base + 2;
-                    tile[(x << 1) + 1] = base + 3;
-                    attr[(x << 1)] = tile_palette_map[t][2];
-                    attr[(x << 1) + 1] = tile_palette_map[t][3];
-                } else if (fall_mask[y] & xbit) {
-                    tile[(x << 1)] = HW_TILE_BASE(RT_EMPTY);
-                    tile[(x << 1) + 1] = HW_TILE_BASE(RT_EMPTY) + 1;
-                    attr[(x << 1)] = tile_palette_map[RT_EMPTY][0];
-                    attr[(x << 1) + 1] = tile_palette_map[RT_EMPTY][1];
-                } else {
-                    t = visual[y][x];
-                    base = HW_TILE_BASE(t);
-                    tile[(x << 1)] = base;
-                    tile[(x << 1) + 1] = base + 1;
-                    attr[(x << 1)] = tile_palette_map[t][0];
-                    attr[(x << 1) + 1] = tile_palette_map[t][1];
-                }
-                /* bottom hw-row of cell (x, y) */
-                if (fall_mask[y] & xbit) {
-                    t = visual[y][x];            /* faller's top half */
-                    base = HW_TILE_BASE(t);
-                    tile[16 + (x << 1)] = base;
-                    tile[16 + (x << 1) + 1] = base + 1;
-                } else {
-                    t = visual[y][x];
-                    base = HW_TILE_BASE(t);
-                    tile[16 + (x << 1)] = base + 2;
-                    tile[16 + (x << 1) + 1] = base + 3;
-                }
-                /* unify palettes vertically (legacy anti-split fix) */
-                attr[16 + (x << 1)] = attr[(x << 1)];
-                attr[16 + (x << 1) + 1] = attr[(x << 1) + 1];
-            }
-            rtv_stage_row(y, attr, tile);
-        }
-        vsync();
+        for (x = 0; x < 8; x++)
+            if (col_mask[x]) rtv_shift_column(x, col_mask[x], 0);
         rtv_blast();
+        frame_tick();
         FRAME_HOOK();
 
-        /* MOVE one cell (emission order is per-column bottom-up, so
-           in-order moves never overwrite a pending faller) */
+        /* FULL-STEP: slide once more — the tile lands in the cell
+           below, its old cell's bottom row becomes empty */
+        rtv_stage_reset();
+        for (x = 0; x < 8; x++)
+            if (col_mask[x]) rtv_shift_column(x, col_mask[x], 1);
+        /* MOVE one cell in the logical board */
         for (i = 0; i < n_falls; i++) {
             if (falls[i].cur < falls[i].to) {
                 visual[falls[i].cur][falls[i].x] = RT_EMPTY;
@@ -381,16 +444,9 @@ void rta_play(const rt_engine *e) BANKED
                 visual[falls[i].cur][falls[i].x] = falls[i].tile;
             }
         }
-
-        /* FULL-STEP: stage the dirty rows normally and land */
-        rtv_stage_reset();
-        for (y = 0; y < 8; y++) {
-            if (dirty & (uint8_t)(1 << y)) {
-                rtv_stage_board_row(visual, y);
-            }
-        }
-        vsync();
         rtv_blast();
+        frame_tick();
+        FRAME_HOOK();
         {
             uint8_t d = RTA_PARAMS->gravity_delay[step > 7 ? 7 : step];
             if (d > 1) wait_frames(d - 1);
@@ -403,125 +459,51 @@ void rta_play(const rt_engine *e) BANKED
        render_refill_drop — never a pop-in. After landing, a short
        ghost hold, then the real tiles reveal. */
     {
-        uint8_t empty_rows[8];
         uint8_t max_empty = 0;
 
-        memset(empty_rows, 0, sizeof(empty_rows));
-        for (i = 0; i < e->event_count; i++) {
-            const rt_event *ev = &e->events[i];
-            if (ev->type == RT_EV_REFILL) {
+        memset(rf_empty, 0, sizeof(rf_empty));
+        {
+            const rt_event *ev = e->events + e->event_count;
+            while (ev > e->events && (ev - 1)->type == RT_EV_REFILL) {
+                ev--;
                 visual[ev->b][ev->a] = ev->c;
-                empty_rows[ev->a]++;
+                rf_empty[ev->a]++;
             }
         }
         for (x = 0; x < 8; x++)
-            if (empty_rows[x] > max_empty) max_empty = empty_rows[x];
+            if (rf_empty[x] > max_empty) max_empty = rf_empty[x];
 
         if (max_empty) {
             ngau_event(NGAU_EV_REFILL);
             for (step = 0; step < max_empty; step++) {
-                uint8_t visible_rows = step + 1;
-                uint8_t attr[32], tile[32];
-
-                /* HALF-STEP: the falling group straddles cells */
-                rtv_stage_reset();
-                for (y = 0; y <= step; y++) {
+                uint8_t sub;
+                /* two conveyor sub-steps per row (half, full): the
+                   ghost stack enters bottom tile first, bottom half
+                   first. A column whose stack has fully arrived shows
+                   its real tiles from its next sub-step on (legacy). */
+                for (sub = 0; sub < 2; sub++) {
+                    uint8_t k = (uint8_t)((step << 1) + sub);
+                    rtv_stage_reset();
                     for (x = 0; x < 8; x++) {
-                        uint8_t col_active =
-                            (empty_rows[x] >= visible_rows);
-                        uint8_t vis = col_active
-                            ? (uint8_t)(empty_rows[x] - visible_rows)
-                            : 0;
-                        uint8_t in_transit =
-                            col_active && (y + vis < empty_rows[x]);
-                        uint8_t t, base;
-
-                        if (in_transit) {
-                            /* top hw-row: bottom half of the tile
-                               arriving from above (ghost) */
-                            t = visual[y + vis][x];
-                            base = HW_TILE_BASE_GHOST(t);
-                            tile[(x << 1)] = base + 2;
-                            tile[(x << 1) + 1] = base + 3;
-                            attr[(x << 1)] = tile_palette_map[t][0];
-                            attr[(x << 1) + 1] = tile_palette_map[t][0];
-                            if (y + vis + 1 < empty_rows[x]) {
-                                t = visual[y + vis + 1][x];
-                                base = HW_TILE_BASE_GHOST(t);
-                                tile[16 + (x << 1)] = base;
-                                tile[16 + (x << 1) + 1] = base + 1;
-                                attr[16 + (x << 1)] =
-                                    tile_palette_map[t][0];
-                                attr[16 + (x << 1) + 1] =
-                                    tile_palette_map[t][0];
-                            } else {
-                                base = HW_TILE_BASE(RT_EMPTY);
-                                tile[16 + (x << 1)] = base + 2;
-                                tile[16 + (x << 1) + 1] = base + 3;
-                                attr[16 + (x << 1)] =
-                                    tile_palette_map[RT_EMPTY][0];
-                                attr[16 + (x << 1) + 1] =
-                                    tile_palette_map[RT_EMPTY][0];
-                            }
-                        } else {
-                            t = visual[y][x];
-                            base = HW_TILE_BASE(t);
-                            tile[(x << 1)] = base;
-                            tile[(x << 1) + 1] = base + 1;
-                            tile[16 + (x << 1)] = base + 2;
-                            tile[16 + (x << 1) + 1] = base + 3;
-                            attr[(x << 1)] = tile_palette_map[t][0];
-                            attr[(x << 1) + 1] = tile_palette_map[t][1];
-                            attr[16 + (x << 1)] = tile_palette_map[t][2];
-                            attr[16 + (x << 1) + 1] =
-                                tile_palette_map[t][3];
+                        uint8_t n = rf_empty[x];
+                        if (k < (uint8_t)(n << 1)) {
+                            uint8_t t = visual[n - 1 - (k >> 1)][x];
+                            uint8_t base = HW_TILE_BASE_GHOST(t);
+                            uint8_t pal = tile_palette_map[t][0];
+                            if (sub == 0)      /* bottom half enters */
+                                rtv_conveyor_step(x, k, base + 2, base + 3, pal);
+                            else               /* then its top half */
+                                rtv_conveyor_step(x, k, base, base + 1, pal);
+                        } else if (n && k == (uint8_t)(n << 1)) {
+                            /* stack landed: real tiles (legacy reveal) */
+                            for (y = 0; y < n; y++)
+                                rtv_stage_tile(x, y, visual[y][x]);
                         }
                     }
-                    rtv_stage_row(y, attr, tile);
+                    rtv_blast();
+                    frame_tick();
+                    FRAME_HOOK();
                 }
-                vsync();
-                rtv_blast();
-                FRAME_HOOK();
-
-                /* FULL-STEP: group lands one row lower (transit
-                   cells still ghost; palettes unified per legacy) */
-                rtv_stage_reset();
-                for (y = 0; y <= step; y++) {
-                    for (x = 0; x < 8; x++) {
-                        uint8_t col_active =
-                            (empty_rows[x] >= visible_rows);
-                        uint8_t vis = col_active
-                            ? (uint8_t)(empty_rows[x] - visible_rows)
-                            : 0;
-                        uint8_t t, base, pal, use_ghost;
-
-                        if (y + vis < empty_rows[x]) {
-                            t = visual[y + vis][x];
-                            use_ghost = col_active;
-                        } else if (y < empty_rows[x]) {
-                            t = RT_EMPTY;
-                            use_ghost = 0;
-                        } else {
-                            t = visual[y][x];
-                            use_ghost = 0;
-                        }
-                        base = use_ghost ? HW_TILE_BASE_GHOST(t)
-                                         : HW_TILE_BASE(t);
-                        pal = tile_palette_map[t][0];
-                        tile[(x << 1)] = base;
-                        tile[(x << 1) + 1] = base + 1;
-                        tile[16 + (x << 1)] = base + 2;
-                        tile[16 + (x << 1) + 1] = base + 3;
-                        attr[(x << 1)] = pal;
-                        attr[(x << 1) + 1] = pal;
-                        attr[16 + (x << 1)] = pal;
-                        attr[16 + (x << 1) + 1] = pal;
-                    }
-                    rtv_stage_row(y, attr, tile);
-                }
-                vsync();
-                rtv_blast();
-                FRAME_HOOK();
                 {
                     uint8_t d = RTA_PARAMS->gravity_delay[
                         step > 7 ? 7 : step];
@@ -532,8 +514,8 @@ void rta_play(const rt_engine *e) BANKED
             wait_frames(8);
         }
     }
-    vsync();
-    rtv_blit_board(visual);
+    rtv_blit_board(visual);          /* stages, then syncs to vblank */
+    frame_tick();
     FRAME_HOOK();
     wait_frames(RTA_PARAMS->pass_gap);
 }
@@ -556,6 +538,7 @@ void rta_play_warning(const uint8_t board[8][8]) BANKED
         VBK_REG = VBK_TILES;
         wait_frames(10);
         rtv_blit_board(board);  /* restores attrs + tiles */
+        frame_tick();
         wait_frames(10);
     }
 }
@@ -686,6 +669,7 @@ void rta_play_swap(uint8_t x1, uint8_t y1,
         rtc_ride((int16_t)((x1 << 4) + dx * off),
                  (int16_t)((y1 << 4) + dy * off));
         vsync();
+        frame_tick();
         FRAME_HOOK();
     }
 
@@ -700,7 +684,11 @@ void rta_play_swap(uint8_t x1, uint8_t y1,
     /* The slide borrowed OBJ palettes 4/5 for the two tiles'
        colors — slot 4 is the battle red, slot 5 the ghost hint
        gray, so a water swap left the next hint bracket blue. One
-       frame for the OAM hide to land, then restore. */
+       frame for the OAM hide to land, then restore. The bracket
+       stays pinned on the landed tile through that frame — the hook
+       would otherwise glide it toward the (possibly not yet
+       corrected) logical cell. */
+    rtc_ride((int16_t)(x2 << 4), (int16_t)(y2 << 4));
     wait_frames(1);
     rtc_hint_palettes();
     rtc_invalidate();

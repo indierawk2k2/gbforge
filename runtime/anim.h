@@ -62,6 +62,18 @@ void rta_init(const uint8_t board[8][8]) BANKED;
 /* Set the visual board directly (mode init / debug redraw). */
 void rta_sync(const uint8_t board[8][8]) BANKED;
 
+/* Flash the matched cells NOW, from rt_find's matched[] — before
+ * rt_process/rt_gravity/rt_refill run. Those take ~2 frames of CPU
+ * per pass; showing the flash first puts that work under the flash
+ * hold instead of in front of any feedback (bead GameBoyGames-7py).
+ * rta_play's own flash step then only waits out the remaining hold. */
+void rta_flash_early(const uint8_t matched[8][8]) BANKED;
+
+/* One frame of the pump (vsync + shake/floats + the game's hook):
+ * installed as rt_engine.yield so the engine's phases never freeze
+ * the cursor for a whole frame. */
+void rta_frame_pump(void) BANKED;
+
 /* Play one resolved pass's event buffer against the visual board:
  * flash matched cells, clear + transmute, animate falls stepwise,
  * reveal refills. Blocks for the animation duration (vsync-paced). */

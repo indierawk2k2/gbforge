@@ -25,8 +25,8 @@ ROM = cascadia$(if $(DEBUG),-debug,).gbc
 LCCFLAGS = -Wm-yC -Wm-yt0x1B -Wm-yo32 -Wm-ya1 -Wl-j -Wl-m $(DEBUGFLAGS)
 INC = -I. -I$(RUNTIME) -I$(GEN) -I$(RES)
 
-RUNTIME_OBJS = engine vram anim flow ui_core hud title ability \
-               reset cursor debug sound_glue_stub
+RUNTIME_OBJS = engine vram vram_dma vram_vbl anim flow ui_core hud title \
+               ability reset cursor debug sound_glue_stub
 GEN_OBJS = mode_config ui_overlays anim_tables title_config scoring_config
 # res ownership: tiles_data.c + palettes.c are editor-owned (the
 # sprite editor round-trips them); ui_tiles.c, spell_icons.c and
@@ -72,6 +72,12 @@ prepare:
 
 $(OBJ)/%.o: %.c
 	$(LCC) $(LCCFLAGS) $(INC) -c -o $@ $<
+
+# engine.c is the per-swap hot path (find/process/gravity/refill run
+# between the swap landing and the flash): let SDCC optimise it for
+# speed. The rest of the runtime is size-optimised as usual.
+$(OBJ)/engine.o: $(RUNTIME)/engine.c
+	$(LCC) $(LCCFLAGS) $(INC) -Wf--opt-code-speed -c -o $@ $<
 
 $(OBJ)/%.o: $(RUNTIME)/%.c
 	$(LCC) $(LCCFLAGS) $(INC) -c -o $@ $<

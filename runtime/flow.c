@@ -15,6 +15,10 @@
 
 uint8_t flow_first_max_run;
 uint8_t flow_any_4plus;
+/* flow_swap already ran rt_find to validate the swap; the resolve
+   loop's first pass reuses that result (a second scan cost ~124
+   scanlines of frozen cursor per swap) */
+static uint8_t flow_prefound;
 
 uint8_t flow_swap(rt_engine *e, const ng_mode_config *cfg,
                   uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2,
@@ -40,6 +44,7 @@ uint8_t flow_swap(rt_engine *e, const ng_mode_config *cfg,
         return 0;
     }
 
+    flow_prefound = 1;   /* matched[] / last_max_run are fresh */
     passes = flow_resolve(e, cfg, tile_for);
     return passes;
 }
@@ -58,7 +63,14 @@ uint8_t flow_resolve(rt_engine *e, const ng_mode_config *cfg,
        into the same pass buffer so playback reveals them in order. */
     do {
         e->event_count = 0;
-        if (!rt_find(e)) break;
+        if (flow_prefound) flow_prefound = 0;
+        else if (!rt_find(e)) break;
+        /* feedback first: the flash goes up before the (slow) resolve,
+           which then runs under the flash hold. One pump between the
+           scan and the flash staging: together they sit right at the
+           frame budget and overran on some passes. */
+        if (e->yield) e->yield();
+        rta_flash_early(e->matched);
         if (passes == 0) flow_first_max_run = e->last_max_run;
         if (e->last_max_run >= 4) flow_any_4plus = 1;
 
@@ -90,11 +102,17 @@ uint8_t flow_resolve(rt_engine *e, const ng_mode_config *cfg,
             e->last_max_run >= cfg->shake_run) {
             rta_start_shake();
         }
+        /* the match/chain jingles above are written to the APU
+           synchronously (up to ~450 register writes) — pump before the
+           process phase so the two never share a frame */
+        if (e->yield) e->yield();
         rt_process(e);
+        if (e->yield) e->yield();
         rt_gravity(e);
         if (cfg->refill && tile_for) {
             rt_refill(e, tile_for);
         }
+        if (e->yield) e->yield();
         rta_play(e);
         passes++;
     } while (1);

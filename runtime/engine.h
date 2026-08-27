@@ -99,6 +99,12 @@ typedef struct {
     uint8_t (*rng)(uint8_t n);
 
     rt_event events[RT_MAX_EVENTS];
+    /* Optional per-frame pump the engine calls between its phases so
+       the resolve (~4 frames of SDCC-generated scanning) never freezes
+       the cursor / floats / input for a whole frame. NULL on host
+       builds and wherever timing does not matter; results are
+       identical either way. */
+    void (*yield)(void);
     uint8_t event_count;
 } rt_engine;
 

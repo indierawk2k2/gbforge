@@ -33,10 +33,10 @@ expressiveness.
 The division of labor is deliberate, so here it is precisely: the
 **spec** declares presentation, animation, and mode policy; board
 geometry and the match/gravity/cascade resolution loop live in the
-**shared runtime**; and a thin **per-game C entry point** (317 lines
+**shared runtime**; and a thin **per-game C entry point** (337 lines
 in the example) wires input edges, score and move counters, and the
 win/lose ladder to both. A second game costs 44 lines of spec and a
-~320-line loop instead of a 3,000-line engine — and every timing and
+~340-line loop instead of a 3,500-line engine — and every timing and
 layout decision stays declarative and hot-tunable.
 
 The reason to do this now is economic. With coding agents doing
@@ -52,7 +52,7 @@ repository is what that looks like in practice.
 `examples/cascadia/` is a complete match-3: swap-to-match, gravity,
 refills, cascade chains, 10 points a tile, win at 1000, lose after 30
 moves. Its declarative surface is [44 lines of Python](examples/cascadia/cascadia.py)
-(the score/move rules themselves live in the 286-line per-game loop —
+(the score/move rules themselves live in the 337-line per-game loop —
 see the table below for exactly who writes what):
 
 ```python
@@ -93,10 +93,10 @@ Everything below is measured from this tree.
 | Piece | Size | Written by |
 |---|---|---|
 | `cascadia.py` — the spec | 44 lines | you |
-| `main_cascadia.c` — input edges, score and move counters, the win ladder | 317 lines | you, once per game |
+| `main_cascadia.c` — input edges, score and move counters, the win ladder | 337 lines | you, once per game |
 | `generated/` — config tables and baked overlay text | 339 lines, 9 files | gbforge, from the spec |
 
-**361 authored lines per game.** That is the number the whole design is
+**381 authored lines per game.** That is the number the whole design is
 arranged to produce, and it is the only number here that scales with
 how many games you build.
 
@@ -106,16 +106,16 @@ Written once. A second game adds nothing to this column.
 
 | Piece | Size | Notes |
 |---|---|---|
-| `runtime/` — engine, animator, VRAM, HUD, title | 3,012 lines of C, 15 files | hand-written against the hardware's timing windows |
+| `runtime/` — engine, animator, VRAM, HUD, title | 3,506 lines of C, 17 files | hand-written against the hardware's timing windows |
 | `gbforge/` — model, codegen, reference sim | 2,309 lines, 22 files | the abstraction and its Python twin |
-| `harness/` — headless emulator, client, scenarios | 2,992 lines | [the verification loop](#the-verification-loop) |
+| `harness/` — headless emulator, client, scenarios | 2,965 lines | [the verification loop](#the-verification-loop) |
 | `scripts/` — asset generation, bank checker, gates | 2,081 lines | |
-| `tests/` — transcript oracle, contract tests | 435 lines | |
+| `tests/` — transcript oracle, contract tests | 482 lines | |
 | `tools/sprite-editor/` — tile and palette editor | 6,275 lines of Swift | [the art tools](#the-art-tools) |
 | `examples/cascadia/res/` — art, palettes, two font weights | 1,492 lines, 13 files | the editor + `gen_placeholder_res.py` |
 
-Roughly 10,800 lines of runtime, model, harness and gates sit under
-those 361. The ratio is the argument: the expensive half is paid once,
+Roughly 11,300 lines of runtime, model, harness and gates sit under
+those 381. The ratio is the argument: the expensive half is paid once,
 and the machine that reads the spec is smaller than the runtime that
 executes it — which is the point, not an apology for it.
 
@@ -217,11 +217,32 @@ mutates logic state, which is what makes the engine a pure function
 that can run 10,000 boards on a laptop in under a second, and what
 makes animation timing a number in a Python file.
 
-**Staged row blasting** (`runtime/vram.c`). Mid-animation board updates
-are precomputed CPU-side — 32 attribute bytes and 32 tile bytes per
-logical row — then written raw during VBlank, or STAT-guarded if the
-raster has already passed. Doing the arithmetic outside the blanking
-window is what makes the write fit inside it.
+**The board is a shadow, and the shadow is DMA'd** (`runtime/vram_dma.c`,
+`runtime/vram_vbl.c`). Every board update — a fall step, a refill
+row, a match flash — is composed CPU-side into a byte-exact shadow of
+the BG map rows the board occupies (both VRAM banks, all 32 columns,
+so a dirty span is contiguous), and landed with the CGB's
+general-purpose DMA *inside the VBlank interrupt*, installed ahead of
+any sound driver. Two register setups move a whole board in about
+4.5 scanlines of the 10 available; a CPU copy can move about 2.7
+bytes per scanline once the raster is active, which was 24 scanlines
+per board row against a beam that crosses one in 16 — the middle rows
+tore and the bottom rows lagged a frame on anything taller than two
+rows. Motion is cheap in the shadow too: a fall sub-step is "these
+cells' hardware rows move down one row", a refill is a conveyor that
+inserts the incoming half-tile at the top, and each hardware row keeps
+its own tile's palette, so a tile straddling two cells is never
+painted in the colour of the tile above it.
+
+**Nothing freezes the frame.** The resolve of a pass — find, process,
+gravity, refill — is a few frames of 8-bit scanning, and the animator
+owns the CPU for dozens of frames after it. Both yield to one frame
+pump (`rt_engine.yield`, `rta_frame_pump`) between phases, so the
+cursor pulse, the "+N" floats and input polling never stop; the match
+flash goes up before the resolve and the resolve runs under the flash
+hold. The harness gate measures all of it per frame: frames the main
+loop never reached `vsync()`, sprites that held still, blocks the beam
+scanned that matched neither the previous nor the current VRAM.
 
 **Derived art.** Ghost tiles — the faded copies drawn for a tile in
 transit during a refill — are generated from the artist's real tile
@@ -232,7 +253,12 @@ the same gem twice, and the two can't drift.
 lookup tables instead of dividing (`digit_tens[]`/`digit_ones[]`).
 `hud.c` tests ability ownership against a mask table rather than
 `1 << id`, because SDCC 4.5 miscompiled the variable-shift form — the
-kind of thing you only find by running the ROM.
+kind of thing you only find by running the ROM. Two more that cost
+whole frames until an LY-stamped trace found them: `x + run < W` is a
+*signed 16-bit* compare in C, ~50 instructions on this CPU, so the hot
+scans index with single 8-bit variables; and a function whose locals
+pass 127 bytes loses `ldhl sp` addressing for every one of them, so
+the engine's scratch boards are statics.
 
 ## Built by agents, working in parallel
 
@@ -302,7 +328,7 @@ with no window and no wall clock.
 
 ```bash
 make -C harness gbctl     # fetch + build SameBoy, build gbctl (~1 min once)
-make -C harness test      # 20 scenarios, ~2s
+make -C harness test      # 20 scenarios, ~3s
 ```
 
 What a scenario can do:

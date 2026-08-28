@@ -498,7 +498,13 @@ void rta_play(const rt_engine *e) BANKED
                         uint8_t n = rf_empty[x];
                         if (k < (uint8_t)(n << 1)) {
                             uint8_t t = visual[n - 1 - (k >> 1)][x];
-                            uint8_t base = HW_TILE_BASE_GHOST(t);
+                            /* REAL tile halves, not the faded
+                               ghosts: manna corner subtiles are
+                               mostly background, so the ghost
+                               transform left them near-blank — the
+                               reported one-frame white half-tile
+                               during refill */
+                            uint8_t base = HW_TILE_BASE(t);
                             uint8_t pal = tile_palette_map[t][0];
                             if (sub == 0)      /* bottom half enters */
                                 rtv_conveyor_step(x, k, base + 2, base + 3, pal);

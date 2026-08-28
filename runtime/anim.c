@@ -440,6 +440,14 @@ void rta_play(const rt_engine *e) BANKED
         rtv_blast();
         frame_tick();
         FRAME_HOOK();
+        /* hold the half-step as long as the full-step below: a
+           1-frame straddle between multi-frame holds reads as a
+           white flicker (the sparse bottom-half art barely
+           registers in one frame), not as motion */
+        {
+            uint8_t d = RTA_PARAMS->gravity_delay[step > 7 ? 7 : step];
+            if (d > 1) wait_frames(d >> 1);
+        }
 
         /* FULL-STEP: slide once more — the tile lands in the cell
            below, its old cell's bottom row becomes empty */
@@ -458,8 +466,10 @@ void rta_play(const rt_engine *e) BANKED
         frame_tick();
         FRAME_HOOK();
         {
+            /* remainder of the step budget (total per step stays
+               d+1 frames: 1+h and 1+(d-1-h) around the two blasts) */
             uint8_t d = RTA_PARAMS->gravity_delay[step > 7 ? 7 : step];
-            if (d > 1) wait_frames(d - 1);
+            if (d > 1) wait_frames((uint8_t)(d - 1 - (d >> 1)));
         }
         step++;
     }
@@ -519,11 +529,19 @@ void rta_play(const rt_engine *e) BANKED
                     rtv_blast();
                     frame_tick();
                     FRAME_HOOK();
-                }
-                {
-                    uint8_t d = RTA_PARAMS->gravity_delay[
-                        step > 7 ? 7 : step];
-                    if (d > 1) wait_frames(d - 1);
+                    /* split the step budget across BOTH sub-frames
+                       (total still d+1): a 1-frame half-state
+                       between multi-frame holds strobes — the
+                       sparse bottom-half art of an entering tile
+                       barely registers in one frame and the entry
+                       reads as a white hole at the top */
+                    {
+                        uint8_t d = RTA_PARAMS->gravity_delay[
+                            step > 7 ? 7 : step];
+                        uint8_t h = sub ? (uint8_t)(d - 1 - (d >> 1))
+                                        : (uint8_t)(d >> 1);
+                        if (d > 1 && h) wait_frames(h);
+                    }
                 }
             }
             /* ghost hold, then reveal the real tiles */

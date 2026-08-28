@@ -179,7 +179,7 @@ it catches.
   arithmetic *before* the blanking window, not inside it.
 - **Don't trust SDCC silently.** It has miscompiled a variable shift
   in this codebase (`hud.c` uses a mask table because of it). If
-  behaviour disagrees with the source, check the `.asm` in `obj/`.
+  behavior disagrees with the source, check the `.asm` in `obj/`.
 - **No new dependencies** — Python stdlib, GBDK, and the host C and
   Swift toolchains. See *When to stop and ask*.
 - **No borrowed assets.** Everything visual ships from

@@ -135,7 +135,7 @@ Written once. A second game adds nothing to this column.
 
 | Piece | Size | Notes |
 |---|---|---|
-| `runtime/` — engine, animator, VRAM, HUD, title | 3,856 lines of C, 18 files | source, not generated — tuned against the hardware's timing windows |
+| `runtime/` — engine, animator, VRAM, HUD, title | 3,880 lines of C, 18 files | source, not generated — tuned against the hardware's timing windows |
 | `gbforge/` — model, codegen, reference sim | 2,370 lines, 23 files | the abstraction and its Python twin |
 | `harness/` — headless emulator, client, scenarios | 3,011 lines | [the verification loop](#the-verification-loop) |
 | `scripts/` — asset generation, bank checker, gates | 2,081 lines | |
@@ -143,7 +143,7 @@ Written once. A second game adds nothing to this column.
 | `tools/sprite-editor/` — tile and palette editor | 6,275 lines of Swift | [the art tools](#the-art-tools) |
 | `examples/cascadia/res/` — art, palettes, two font weights | 1,492 lines, 13 files | the editor + `gen_placeholder_res.py` |
 
-Roughly 11,750 lines of runtime, model, harness and gates sit under
+Roughly 11,800 lines of runtime, model, harness and gates sit under
 those 381. The ratio is the argument: the expensive half is paid once,
 and the machine that reads the spec is smaller than the runtime that
 executes it — which is the point, not an apology for it.
@@ -221,14 +221,14 @@ The title screen runs on the same machinery with a second, 16×16
 weight of the font — drawn at a 3px stem rather than scaled up,
 because doubling an 8px face gives hairline strokes on a big body and
 a monospaced grid. `gen_title` bakes the spec's `logo_text` into a
-two-row run and centres its **ink** — not its advance width, and not
+two-row run and centers its **ink** — not its advance width, and not
 the tile run — so the logo lands on the exact middle pixel instead of
 the nearest tile. The menu is laid out as one block: arrows share a
 column, labels share a left edge, and because the arrow is a
 background tile that can only sit on an 8px boundary while the labels
 are baked and can sit anywhere, the arrow snaps and the *gap* absorbs
 the error. Letting the labels follow the snapped arrow instead is what
-puts a menu up to 4px off centre.
+puts a menu up to 4px off center.
 
 The same idea covers counters that need to sit *off* the tile grid:
 the res pack carries pre-shifted copies of the digit set, baked
@@ -261,7 +261,7 @@ rows. Motion is cheap in the shadow too: a fall sub-step is "these
 cells' hardware rows move down one row", a refill is a conveyor that
 inserts the incoming half-tile at the top, and each hardware row keeps
 its own tile's palette, so a tile straddling two cells is never
-painted in the colour of the tile above it.
+painted in the color of the tile above it.
 
 **Nothing freezes the frame.** The resolve of a pass — find, process,
 gravity, refill — is a few frames of 8-bit scanning, and the animator
@@ -297,8 +297,8 @@ Everything here came out of that.
 
 I have not read a code diff on this project. That is not a principle —
 I read code at the start, and it stopped scaling after a few days. What
-I do instead is validate behaviour after big changes and new features,
-and read verdicts about behaviour after every build. Behaviour here
+I do instead is validate behavior after big changes and new features,
+and read verdicts about behavior after every build. Behaviour here
 means the game's accuracy, performance and feel, driven through an
 emulator by the agent itself. Everything below fell out of hitting a
 new constraint and evolving the workflow around it.
@@ -333,14 +333,18 @@ three days I moved back to serial, and stayed there for five months.
 
 **4 · An abstraction layer is what actually enables parallelism.** No
 matter how the agents were scheduled they kept colliding, because the
-problem was not scheduling. The fix was architectural: separate the
-game spec from the game runtime so there are natural boundaries to work
-inside. That is [Built by
-agents](#built-by-agents-working-in-parallel), and it is the resolution
-of a problem I first hit in March. Once it was done the rewrite itself
-went quickly — five days from the first harness commit to retiring the
-hand-built engine, in eleven milestones with an equivalence gate on
-each.
+problem was not scheduling. What fixed it was architectural: separating
+the game spec from the game runtime, so there are natural boundaries to
+work inside. That is [Built by
+agents](#built-by-agents-working-in-parallel). Worth being honest that I
+did not build it for this reason — I built it because agents kept
+changing one mode and leaving the other five behind — and parallelism
+fell out of it. It resolved a problem I had first hit in March and
+stopped trying to solve.
+
+Once it was done the rewrite itself went quickly — five days from the
+first harness commit to retiring the hand-built engine, in eleven
+milestones with an equivalence gate on each.
 
 **5 · Creative taste needs a human in the loop.** In my testing, models
 still cannot produce pixel art or chiptune audio I would ship. And even
@@ -348,6 +352,10 @@ once they can, a model's taste will not be mine. So I pointed the
 agents at building a toolset for graphics, animation and sound instead.
 The graphics tool is in this repo — see [The art
 tools](#the-art-tools).
+
+Every one of those five was a correction to something I had got wrong.
+[docs/retro.md](docs/retro.md) is the longer version, with what each one
+cost.
 
 ### What this does not catch
 
@@ -382,7 +390,7 @@ change independently:
 |---|---|---|
 | `cascadia.py` + `gbforge/model` | rules, timings, layout | nothing — it's data |
 | `gbforge/codegen` | how a concern becomes tables | its own generated file |
-| `runtime/*.c` | hardware behaviour, performance | other runtime edits |
+| `runtime/*.c` | hardware behavior, performance | other runtime edits |
 | `res/*` | art | nothing — the tools own these files |
 | `harness/scenarios` | what "correct" means | nothing |
 
@@ -514,7 +522,7 @@ built the same way.
 
 In August I tested whether a current model could automate mapping
 artwork onto the Game Boy Color's palette limits. It invented a
-technique that gets more colour on screen than the standard eight
+technique that gets more color on screen than the standard eight
 palettes allow — and the output still did not look as good as the art I
 had hand-tuned. So the technique went into the graphics tool instead,
 as another mode for hand-tuning to work in.

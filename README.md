@@ -137,13 +137,13 @@ Written once. A second game adds nothing to this column.
 |---|---|---|
 | `runtime/` — engine, animator, VRAM, HUD, title | 3,880 lines of C, 18 files | source, not generated — tuned against the hardware's timing windows |
 | `gbforge/` — model, codegen, reference sim | 2,370 lines, 23 files | the abstraction and its Python twin |
-| `harness/` — headless emulator, client, scenarios | 3,011 lines | [the verification loop](#the-verification-loop) |
-| `scripts/` — asset generation, bank checker, gates | 2,081 lines | |
+| `harness/` — headless emulator, client, scenarios | 2,739 lines | [the verification loop](#the-verification-loop) |
+| `scripts/` — asset generation, bank checker, gates | 2,287 lines | |
 | `tests/` — transcript oracle, contract tests | 435 lines | |
 | `tools/sprite-editor/` — tile and palette editor | 6,275 lines of Swift | [the art tools](#the-art-tools) |
 | `examples/cascadia/res/` — art, palettes, two font weights | 1,492 lines, 13 files | the editor + `gen_placeholder_res.py` |
 
-Roughly 11,800 lines of runtime, model, harness and gates sit under
+Roughly 11,700 lines of runtime, model, harness and gates sit under
 those 381. The ratio is the argument: the expensive half is paid once,
 and the machine that reads the spec is smaller than the runtime that
 executes it — which is the point, not an apology for it.

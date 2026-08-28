@@ -5,6 +5,7 @@
 # redundant with another:
 #
 #   1. codegen       spec -> generated/ must be a no-op diff
+#   1b. counts      the README's measured numbers must match the tree
 #   2. transcript    the C engine and the Python model must agree
 #   3. build         both ROMs link, banks check out
 #   4. scenarios     memory + pixel behaviour under emulation
@@ -38,7 +39,7 @@ if [ -n "$GIT_COMMON" ] && [ "$GIT_COMMON" != ".git" ]; then
     done
 fi
 
-echo "=== 1/5 codegen is reproducible ==="
+echo "=== 1/6 codegen is reproducible ==="
 make -C examples/cascadia gen
 if ! git diff --quiet -- examples/cascadia/generated; then
     echo "FAIL: generated/ differs from the spec — commit the regenerated output"
@@ -46,17 +47,20 @@ if ! git diff --quiet -- examples/cascadia/generated; then
     exit 1
 fi
 
-echo "=== 2/5 engine transcript (C vs Python) ==="
+echo "=== 1b/6 README counts ==="
+python3 scripts/check_counts.py
+
+echo "=== 2/6 engine transcript (C vs Python) ==="
 make -C tests
 
-echo "=== 3/5 ROM build ==="
+echo "=== 3/6 ROM build ==="
 make -C examples/cascadia
 make -C examples/cascadia debug
 
-echo "=== 4/5 emulator scenarios ==="
+echo "=== 4/6 emulator scenarios ==="
 make -C harness test
 
-echo "=== 5/5 asset boundary ==="
+echo "=== 5/6 asset boundary ==="
 python3 -m pytest tests/test_asset_contracts.py -q
 
 # The bank check runs inside the ROM link (see examples/cascadia/Makefile).

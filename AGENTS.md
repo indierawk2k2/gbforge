@@ -43,8 +43,9 @@ GBDK_HOME=/opt/gbdk/ ./scripts/verify.sh
 ```
 
 That runs, in the order that fails fastest: codegen reproducibility,
-the engine transcript, both ROM builds, the emulator scenarios, and
-the asset boundary. **Run it before declaring anything done.**
+the README's counts, the engine transcript, both ROM builds, the
+emulator scenarios, and the asset boundary. **Run it before declaring
+anything done.**
 
 And when you report, **say which checks you actually executed and
 which you reasoned about.** Do not describe a check as passing unless
@@ -185,8 +186,11 @@ it catches.
 - **No borrowed assets.** Everything visual ships from
   `gen_placeholder_res.py` or the editor. Nothing from commercial
   ROMs, other projects, or unlicensed libraries goes in this tree.
-- **Measure, don't estimate.** Any count destined for the README
-  (`wc -l`, file counts) is measured from the tree at commit time.
+- **Measure, don't estimate.** Every count in the README is checked
+  against the tree by `scripts/check_counts.py`, which runs in
+  `verify.sh` and fails on drift. `--write` updates them. If you add a
+  numeric claim to the README, add its pattern to that script — one it
+  does not know about is one that will quietly rot.
 
 ## Layout
 
